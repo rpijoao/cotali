@@ -55,6 +55,7 @@ export function QuoteDraftScreen() {
   const [executionDeadline, setExecutionDeadline] = useState('');
   const [notes, setNotes] = useState('');
   const [mutationId, setMutationId] = useState(randomUUID);
+  const [voiceMutationId, setVoiceMutationId] = useState(randomUUID);
   const [reviewing, setReviewing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [hydrated, setHydrated] = useState(false);
@@ -218,7 +219,7 @@ export function QuoteDraftScreen() {
     setVoiceStatus('processing');
     try {
       const interpretation = await interpretQuoteVoice({
-        mutationId,
+        mutationId: voiceMutationId,
         uri: recording.uri,
       });
       applyInterpretation(interpretation);
@@ -394,7 +395,11 @@ export function QuoteDraftScreen() {
           onProcess={processRecording}
           onRecordingChange={(next) => {
             setRecording(next);
-            if (!next) setVoiceStatus('idle');
+            if (next) {
+              setVoiceMutationId(randomUUID());
+            } else {
+              setVoiceStatus('idle');
+            }
           }}
           processing={voiceStatus === 'processing'}
         />
