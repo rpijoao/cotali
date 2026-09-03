@@ -4,6 +4,7 @@ import type {
   VoiceInterpretation,
   VoiceInterpretationJob,
 } from '@cotali/contracts';
+import { Platform } from 'react-native';
 
 const apiUrl = process.env.EXPO_PUBLIC_API_URL ?? 'http://10.0.2.2:3333';
 const developmentToken =
@@ -45,11 +46,7 @@ export async function interpretQuoteVoice(input: {
 
   const form = new FormData();
   form.append('mutationId', input.mutationId);
-  form.append('audio', {
-    name: 'cotali-recording.m4a',
-    type: 'audio/m4a',
-    uri: input.uri,
-  } as unknown as Blob);
+  await appendAudioPart(form, input.uri);
 
   const response = await fetch(`${apiUrl}/v1/voice/interpretations`, {
     body: form,
@@ -67,6 +64,31 @@ export async function interpretQuoteVoice(input: {
   if (isVoiceInterpretation(body)) return body;
   const accepted = body as VoiceInterpretationJob;
   return await waitForVoiceInterpretation(input.mutationId, accepted);
+}
+
+async function appendAudioPart(form: FormData, uri: string): Promise<void> {
+  if (Platform.OS === 'web') {
+    const response = await fetch(uri);
+    if (!response.ok) {
+      throw new Error('NÃ£o foi possÃ­vel ler a gravaÃ§Ã£o no navegador.');
+    }
+    const blob = await response.blob();
+    form.append('audio', blob, audioFilename(blob.type));
+    return;
+  }
+
+  form.append('audio', {
+    name: 'cotali-recording.m4a',
+    type: 'audio/m4a',
+    uri,
+  } as unknown as Blob);
+}
+
+function audioFilename(mimeType: string): string {
+  const subtype = mimeType.split('/')[1]?.split(';')[0] ?? 'webm';
+  const extension =
+    subtype === 'mpeg' ? 'mp3' : subtype === 'x-m4a' ? 'm4a' : subtype;
+  return `cotali-recording.${extension}`;
 }
 
 async function waitForVoiceInterpretation(
