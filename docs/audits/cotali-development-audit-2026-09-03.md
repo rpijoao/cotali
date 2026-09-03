@@ -230,8 +230,9 @@ Ainda em 2026-09-03, o primeiro gate de endurecimento foi aplicado:
 - **COT-001 resolvido:** dependências vulneráveis atualizadas ou substituídas por overrides controlados; `pnpm audit --audit-level moderate` passou sem vulnerabilidades conhecidas.
 - **COT-002 resolvido para o schema atual:** FKs compostas agora garantem que cliente e revisão corrente pertençam à conta/orçamento corretos.
 - **COT-003 resolvido:** instantes migrados para `TIMESTAMPTZ(3)`; validade civil permanece em `DATE`.
-- **COT-005 parcialmente resolvido:** CI criado com auditoria, formatação, lint, tipos, PostgreSQL 18, migrations, integração, testes e builds. A execução remota ocorrerá depois que a baseline for versionada e enviada ao repositório.
+- **COT-004 resolvido:** baseline completa versionada no Git após a execução local dos gates de qualidade e segurança.
+- **COT-005 parcialmente resolvido:** CI criado com auditoria, formatação, lint, tipos, PostgreSQL 18, migrations, integração, testes e builds. A execução remota ocorrerá depois que a baseline for enviada a um repositório remoto.
 - **COT-006 parcialmente resolvido:** adicionados limite de payload, headers de segurança, rate limit, redaction de credenciais e opção para desabilitar Swagger em produção.
 - A migration corretiva foi aplicada e o teste de integração passou no Neon `development`.
 
-Permanece prioritário criar a baseline Git (**COT-004**) e, depois, avançar para o draft local durável e o corte vertical de voz.
+O próximo passo de produto é avançar para o draft local durável e o corte vertical de voz. Para concluir o **COT-005**, a baseline ainda precisa ser enviada a um repositório remoto e ter o workflow executado com sucesso.
