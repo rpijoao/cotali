@@ -216,10 +216,15 @@ export function QuoteDraftScreen() {
 
   async function processRecording() {
     if (!recording) return;
+    const requestMutationId =
+      voiceStatus === 'failed' ? randomUUID() : voiceMutationId;
+    if (requestMutationId !== voiceMutationId) {
+      setVoiceMutationId(requestMutationId);
+    }
     setVoiceStatus('processing');
     try {
       const interpretation = await interpretQuoteVoice({
-        mutationId: voiceMutationId,
+        mutationId: requestMutationId,
         uri: recording.uri,
       });
       applyInterpretation(interpretation);
