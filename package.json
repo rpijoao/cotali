@@ -1,0 +1,33 @@
+{
+  "name": "cotali",
+  "version": "0.0.0",
+  "private": true,
+  "packageManager": "pnpm@11.25.0",
+  "engines": {
+    "node": ">=24 <25"
+  },
+  "scripts": {
+    "build": "turbo run build",
+    "check": "turbo run check",
+    "dev": "turbo run dev",
+    "dev:api": "pnpm --filter @cotali/api dev",
+    "dev:mobile": "pnpm --filter @cotali/mobile dev",
+    "dev:web": "pnpm --filter @cotali/web dev",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "lint": "eslint .",
+    "test": "turbo run test"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.4",
+    "@types/node": "^24.10.1",
+    "cross-env": "^10.1.0",
+    "eslint": "^9.39.4",
+    "pnpm": "11.25.0",
+    "prettier": "^3.8.2",
+    "turbo": "2.10.12",
+    "typescript": "5.9.3",
+    "typescript-eslint": "^8.56.1",
+    "vitest": "^4.1.2"
+  }
+}

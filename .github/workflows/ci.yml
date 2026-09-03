@@ -1,0 +1,77 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_DB: cotali
+          POSTGRES_PASSWORD: cotali
+          POSTGRES_USER: cotali
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U cotali -d cotali"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://cotali:cotali@localhost:5432/cotali?schema=public
+      DATABASE_URL_UNPOOLED: postgresql://cotali:cotali@localhost:5432/cotali?schema=public
+      TEST_DATABASE_URL: postgresql://cotali:cotali@localhost:5432/cotali?schema=public
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
+      - name: Enable pinned pnpm
+        run: |
+          corepack enable
+          corepack install
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Audit dependencies
+        run: pnpm audit --audit-level moderate
+
+      - name: Check formatting
+        run: pnpm format:check
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Check types and schemas
+        run: pnpm check
+
+      - name: Apply migrations to a clean database
+        run: pnpm --filter @cotali/database db:migrate:deploy
+
+      - name: Test PostgreSQL integration
+        run: pnpm --filter @cotali/api exec cross-env RUN_DATABASE_INTEGRATION=true vitest run src/quotes/prisma-quote-repository.integration.test.ts
+
+      - name: Run tests without cache
+        run: pnpm turbo run test --force
+
+      - name: Build all applications
+        run: pnpm turbo run build --force

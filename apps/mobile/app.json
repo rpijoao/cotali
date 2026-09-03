@@ -1,0 +1,27 @@
+{
+  "expo": {
+    "name": "Cotali",
+    "slug": "cotali",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "android": {
+      "package": "br.com.cotali.app"
+    },
+    "plugins": [
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "Permita que o Cotali use o microfone para criar orçamentos por voz.",
+          "recordAudioAndroid": true,
+          "enableBackgroundRecording": false,
+          "enableBackgroundPlayback": false
+        }
+      ],
+      "expo-asset"
+    ],
+    "runtimeVersion": {
+      "policy": "appVersion"
+    }
+  }
+}

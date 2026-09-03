@@ -1,0 +1,28 @@
+{
+  "name": "@cotali/mobile",
+  "version": "0.0.0",
+  "private": true,
+  "main": "expo/AppEntry.js",
+  "scripts": {
+    "build": "expo export --platform android",
+    "check": "tsc --noEmit",
+    "dev": "expo start",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@cotali/contracts": "workspace:*",
+    "@cotali/domain": "workspace:*",
+    "expo": "~57.0.19",
+    "expo-asset": "~57.0.16",
+    "expo-audio": "~57.0.4",
+    "expo-crypto": "~57.0.2",
+    "expo-status-bar": "~57.0.1",
+    "react": "19.2.3",
+    "react-native": "0.86.3"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.7",
+    "typescript": "6.0.3",
+    "vitest": "^4.1.2"
+  }
+}

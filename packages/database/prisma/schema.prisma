@@ -1,0 +1,156 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DATABASE_URL_UNPOOLED")
+}
+
+enum QuoteStatus {
+  DRAFT
+  READY_TO_SHARE
+  SHARED
+}
+
+enum PaymentStatus {
+  PENDING
+  PARTIALLY_PAID
+  PAID
+}
+
+enum QuoteSource {
+  MANUAL
+  INTERPRETATION
+  MIXED
+}
+
+enum PaymentPlanType {
+  INTEGRAL
+  PARTIAL
+  INSTALLMENTS
+}
+
+model Account {
+  id          String       @id @default(uuid()) @db.Uuid
+  authSubject String       @unique @map("auth_subject")
+  clients     Client[]
+  quotes      Quote[]
+  mutations   Mutation[]
+  createdAt   DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime     @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@map("accounts")
+}
+
+model Client {
+  id        String    @id @default(uuid()) @db.Uuid
+  accountId String    @map("account_id") @db.Uuid
+  account   Account   @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  name      String    @db.VarChar(120)
+  phone     String?   @db.VarChar(20)
+  quotes    Quote[]
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(3)
+
+  @@unique([accountId, id])
+  @@index([accountId, name])
+  @@map("clients")
+}
+
+model Quote {
+  id                String         @id @default(uuid()) @db.Uuid
+  accountId         String         @map("account_id") @db.Uuid
+  account           Account        @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  clientId          String         @map("client_id") @db.Uuid
+  client            Client         @relation(fields: [accountId, clientId], references: [accountId, id], onDelete: Restrict)
+  status            QuoteStatus    @default(DRAFT)
+  paymentStatus     PaymentStatus  @default(PENDING) @map("payment_status")
+  totalCents        BigInt         @map("total_cents")
+  currency          String         @default("BRL") @db.Char(3)
+  revisions         QuoteRevision[] @relation("QuoteRevisions")
+  currentRevisionId String?        @unique @map("current_revision_id") @db.Uuid
+  currentRevision   QuoteRevision? @relation("CurrentQuoteRevision", fields: [id, currentRevisionId], references: [quoteId, id], onDelete: Restrict)
+  createdAt         DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt         DateTime       @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt         DateTime?      @map("deleted_at") @db.Timestamptz(3)
+
+  @@index([accountId, createdAt])
+  @@index([clientId])
+  @@unique([id, currentRevisionId])
+  @@map("quotes")
+}
+
+model QuoteRevision {
+  id                String          @id @default(uuid()) @db.Uuid
+  quoteId           String          @map("quote_id") @db.Uuid
+  quote             Quote           @relation("QuoteRevisions", fields: [quoteId], references: [id], onDelete: Cascade)
+  currentForQuote   Quote?          @relation("CurrentQuoteRevision")
+  revisionNumber    Int             @map("revision_number")
+  source            QuoteSource
+  paymentMethod     String?         @map("payment_method") @db.VarChar(80)
+  paymentPlanType   PaymentPlanType @map("payment_plan_type")
+  installmentCount  Int?            @map("installment_count")
+  executionDeadline String?         @map("execution_deadline") @db.VarChar(120)
+  validUntil        DateTime?       @map("valid_until") @db.Date
+  notes             String?         @db.VarChar(1000)
+  servicesSubtotal  BigInt          @map("services_subtotal_cents")
+  materialsSubtotal BigInt          @map("materials_subtotal_cents")
+  subtotalCents     BigInt          @map("subtotal_cents")
+  discountCents     BigInt          @map("discount_cents")
+  totalCents        BigInt          @map("total_cents")
+  services          ServiceLine[]
+  materials         MaterialLine[]
+  createdAt         DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
+  finalizedAt       DateTime?       @map("finalized_at") @db.Timestamptz(3)
+
+  @@unique([quoteId, id])
+  @@unique([quoteId, revisionNumber])
+  @@map("quote_revisions")
+}
+
+model ServiceLine {
+  id               String        @id @default(uuid()) @db.Uuid
+  revisionId       String        @map("revision_id") @db.Uuid
+  revision         QuoteRevision @relation(fields: [revisionId], references: [id], onDelete: Cascade)
+  description      String        @db.VarChar(160)
+  quantity         Decimal       @db.Decimal(18, 3)
+  unit             String?       @db.VarChar(20)
+  unitPriceCents   BigInt?       @map("unit_price_cents")
+  totalCents       BigInt?       @map("total_cents")
+  position         Int
+
+  @@unique([revisionId, position])
+  @@map("service_lines")
+}
+
+model MaterialLine {
+  id               String        @id @default(uuid()) @db.Uuid
+  revisionId       String        @map("revision_id") @db.Uuid
+  revision         QuoteRevision @relation(fields: [revisionId], references: [id], onDelete: Cascade)
+  description      String        @db.VarChar(160)
+  quantity         Decimal       @db.Decimal(18, 3)
+  unit             String?       @db.VarChar(20)
+  unitPriceCents   BigInt?       @map("unit_price_cents")
+  totalCents       BigInt?       @map("total_cents")
+  position         Int
+
+  @@unique([revisionId, position])
+  @@map("material_lines")
+}
+
+model Mutation {
+  id          String   @id @default(uuid()) @db.Uuid
+  accountId   String   @map("account_id") @db.Uuid
+  account     Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  mutationId  String   @map("mutation_id") @db.Uuid
+  commandType String   @map("command_type") @db.VarChar(80)
+  fingerprint String   @db.Char(64)
+  result      Json
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@unique([accountId, mutationId])
+  @@map("mutations")
+}
