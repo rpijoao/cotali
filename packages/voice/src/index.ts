@@ -2,6 +2,7 @@ import {
   VoiceInterpretationSchema,
   type VoiceInterpretation,
 } from '@cotali/contracts';
+import { FormatRegistry } from '@sinclair/typebox';
 import { Value } from '@sinclair/typebox/value';
 import Groq from 'groq-sdk';
 
@@ -77,6 +78,8 @@ const extractionSchema = {
     ambiguities: { type: 'array', items: { type: 'string' }, maxItems: 32 },
   },
 } as const;
+
+registerFormats();
 
 export class GroqVoiceInterpreter implements VoiceInterpreter {
   readonly #client: Groq;
@@ -229,4 +232,35 @@ function toArrayBuffer(value: Buffer): ArrayBuffer {
   const copy = new Uint8Array(value.byteLength);
   copy.set(value);
   return copy.buffer;
+}
+
+function registerFormats(): void {
+  if (!FormatRegistry.Has('uuid')) {
+    FormatRegistry.Set('uuid', (value) =>
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+        value,
+      ),
+    );
+  }
+  if (!FormatRegistry.Has('date')) {
+    FormatRegistry.Set('date', isDateOnly);
+  }
+  if (!FormatRegistry.Has('date-time')) {
+    FormatRegistry.Set('date-time', isDateTime);
+  }
+}
+
+function isDateOnly(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const date = new Date(`${value}T00:00:00.000Z`);
+  return (
+    !Number.isNaN(date.valueOf()) && date.toISOString().slice(0, 10) === value
+  );
+}
+
+function isDateTime(value: string): boolean {
+  return (
+    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/.test(value) &&
+    !Number.isNaN(Date.parse(value))
+  );
 }
