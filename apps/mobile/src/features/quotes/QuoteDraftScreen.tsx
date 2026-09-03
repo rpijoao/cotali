@@ -5,7 +5,7 @@ import {
   QuoteDomainError,
 } from '@cotali/domain';
 import { randomUUID } from 'expo-crypto';
-import { useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import {
   Alert,
   KeyboardAvoidingView,
@@ -19,10 +19,17 @@ import {
 } from 'react-native';
 import { formatBrl, formatBrlInput, parseBrlInput } from './money';
 import { createQuoteDraft } from './quote-api';
+import {
+  clearLocalQuoteDraft,
+  loadLocalQuoteDraft,
+  saveLocalQuoteDraft,
+} from './quote-draft-storage';
+import type { LocalQuoteDraft, PaymentPlan } from './quote-draft-state';
 import { QuoteLineEditor, type EditableQuoteLine } from './QuoteLineEditor';
-import { VoiceCaptureCard } from '../voice/VoiceCaptureCard';
-
-type PaymentPlan = 'installments' | 'integral' | 'partial';
+import {
+  VoiceCaptureCard,
+  type CapturedRecording,
+} from '../voice/VoiceCaptureCard';
 
 const emptyLine = (): EditableQuoteLine => ({
   description: '',
@@ -42,10 +49,83 @@ export function QuoteDraftScreen() {
   const [installmentCount, setInstallmentCount] = useState('2');
   const [executionDeadline, setExecutionDeadline] = useState('');
   const [notes, setNotes] = useState('');
+  const [mutationId, setMutationId] = useState(randomUUID);
   const [reviewing, setReviewing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [hydrated, setHydrated] = useState(false);
+  const [persistenceStatus, setPersistenceStatus] = useState<
+    'error' | 'pending' | 'saved'
+  >('pending');
+  const [recording, setRecording] = useState<CapturedRecording | null>(null);
   const [pendingSubmission, setPendingSubmission] =
     useState<CreateQuoteDraft | null>(null);
+
+  const localDraft = useMemo<LocalQuoteDraft>(
+    () => ({
+      clientName,
+      clientPhone,
+      discount,
+      executionDeadline,
+      installmentCount,
+      materials,
+      mutationId,
+      notes,
+      paymentMethod,
+      paymentPlan,
+      services,
+      version: 1,
+    }),
+    [
+      clientName,
+      clientPhone,
+      discount,
+      executionDeadline,
+      installmentCount,
+      materials,
+      mutationId,
+      notes,
+      paymentMethod,
+      paymentPlan,
+      services,
+    ],
+  );
+
+  useEffect(() => {
+    let active = true;
+    void loadLocalQuoteDraft()
+      .then((draft) => {
+        if (!active || !draft) return;
+        setClientName(draft.clientName);
+        setClientPhone(draft.clientPhone);
+        setDiscount(draft.discount);
+        setExecutionDeadline(draft.executionDeadline);
+        setInstallmentCount(draft.installmentCount);
+        setMaterials(draft.materials);
+        setMutationId(draft.mutationId);
+        setNotes(draft.notes);
+        setPaymentMethod(draft.paymentMethod);
+        setPaymentPlan(draft.paymentPlan);
+        setServices(draft.services);
+      })
+      .catch(() => setPersistenceStatus('error'))
+      .finally(() => {
+        if (active) setHydrated(true);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    setPersistenceStatus('pending');
+    const timeout = setTimeout(() => {
+      void saveLocalQuoteDraft(localDraft)
+        .then(() => setPersistenceStatus('saved'))
+        .catch(() => setPersistenceStatus('error'));
+    }, 400);
+    return () => clearTimeout(timeout);
+  }, [hydrated, localDraft]);
 
   const totals = useMemo(() => {
     try {
@@ -108,6 +188,8 @@ export function QuoteDraftScreen() {
         'Orçamento salvo',
         `Rascunho ${quote.id.slice(0, 8)} criado com sucesso.`,
       );
+      await clearLocalQuoteDraft();
+      resetForm();
     } catch (error) {
       Alert.alert(
         'Não foi possível salvar',
@@ -134,10 +216,27 @@ export function QuoteDraftScreen() {
       },
       discountInCents: parseBrlInput(discount) ?? 0,
       materials: materials.map(toDomainLine),
-      mutationId: randomUUID(),
+      mutationId,
       services: services.map(toDomainLine),
       source: 'manual',
     };
+  }
+
+  function resetForm() {
+    setClientName('');
+    setClientPhone('');
+    setServices([emptyLine()]);
+    setMaterials([]);
+    setDiscount('');
+    setPaymentMethod('Pix');
+    setPaymentPlan('integral');
+    setInstallmentCount('2');
+    setExecutionDeadline('');
+    setNotes('');
+    setMutationId(randomUUID());
+    setPendingSubmission(null);
+    setRecording(null);
+    setReviewing(false);
   }
 
   if (reviewing && totals) {
@@ -223,7 +322,26 @@ export function QuoteDraftScreen() {
         <Text style={styles.subtitle}>
           Fale uma vez ou preencha manualmente.
         </Text>
-        <VoiceCaptureCard />
+        <VoiceCaptureCard onRecordingChange={setRecording} />
+        <Text
+          style={
+            persistenceStatus === 'error'
+              ? styles.persistenceError
+              : styles.persistenceStatus
+          }
+        >
+          {persistenceStatus === 'saved'
+            ? 'Rascunho salvo neste aparelho'
+            : persistenceStatus === 'error'
+              ? 'Não foi possível salvar o rascunho local'
+              : 'Salvando rascunho…'}
+        </Text>
+        {recording && (
+          <Text style={styles.recordingStatus}>
+            Áudio capturado. O envio para interpretação será habilitado no
+            próximo corte do fluxo de voz.
+          </Text>
+        )}
         <Section title="Cliente">
           <Field label="Nome">
             <TextInput
@@ -519,6 +637,8 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     marginTop: 8,
   },
+  persistenceError: { color: '#A23B35', fontSize: 13, fontWeight: '700' },
+  persistenceStatus: { color: '#527064', fontSize: 13, fontWeight: '700' },
   primaryButton: {
     alignItems: 'center',
     backgroundColor: '#16875D',
@@ -541,6 +661,14 @@ const styles = StyleSheet.create({
   reviewMeta: { color: '#718078', fontSize: 13, marginTop: 3 },
   reviewName: { color: '#19372A', fontSize: 16, fontWeight: '700' },
   reviewPrice: { color: '#19372A', fontSize: 15, fontWeight: '700' },
+  recordingStatus: {
+    backgroundColor: '#E4F0E9',
+    borderRadius: 12,
+    color: '#315D49',
+    fontSize: 13,
+    lineHeight: 19,
+    padding: 12,
+  },
   reviewRow: { flexDirection: 'row', justifyContent: 'space-between' },
   reviewRowText: { color: '#476052', fontSize: 15 },
   screen: {

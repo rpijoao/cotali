@@ -11,7 +11,7 @@ import { formatDuration } from './voice-duration';
 
 const MAX_RECORDING_DURATION_MS = 120_000;
 
-type CapturedRecording = Readonly<{
+export type CapturedRecording = Readonly<{
   durationMs: number;
   uri: string;
 }>;
