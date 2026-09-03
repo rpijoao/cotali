@@ -1,4 +1,8 @@
-import type { VoiceInterpretation } from '@cotali/contracts';
+import type {
+  VoiceInterpretation,
+  VoiceInterpretationJob,
+} from '@cotali/contracts';
+import type { VoiceJobRepository } from '@cotali/database';
 import type { FastifyInstance } from 'fastify';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
@@ -93,7 +97,84 @@ describe('POST /v1/voice/interpretations', () => {
       error: { code: 'VOICE_NOT_CONFIGURED' },
     });
   });
+
+  it('enqueues a durable job and exposes its status', async () => {
+    const repository = new FakeVoiceJobRepository();
+    app = await buildApp({
+      authenticator: new StaticAuthenticator(),
+      docsEnabled: false,
+      logger: false,
+      quoteService: new QuoteService(),
+      voiceJobRepository: repository,
+    });
+
+    const mutationId = '73070f7c-a464-47d7-90bf-b06ac2ce7a1e';
+    const accepted = await app.inject({
+      method: 'POST',
+      payload: multipartBody(mutationId),
+      url: '/v1/voice/interpretations',
+      headers: {
+        authorization: 'Bearer test-token',
+        'content-type': 'multipart/form-data; boundary=cotali-test',
+      },
+    });
+
+    expect(accepted.statusCode).toBe(202);
+    expect(accepted.json()).toMatchObject({
+      mutationId,
+      status: 'pending',
+      interpretation: null,
+    });
+
+    repository.job = {
+      ...repository.job!,
+      status: 'completed',
+      interpretation: fakeInterpretation(mutationId),
+    };
+    const status = await app.inject({
+      method: 'GET',
+      url: `/v1/voice/interpretations/${mutationId}`,
+      headers: { authorization: 'Bearer test-token' },
+    });
+
+    expect(status.statusCode).toBe(200);
+    expect(status.json()).toMatchObject({
+      mutationId,
+      status: 'completed',
+      interpretation: { id: mutationId },
+    });
+  });
 });
+
+class FakeVoiceJobRepository implements VoiceJobRepository {
+  job: VoiceInterpretationJob | null = null;
+
+  async enqueue(input: {
+    authSubject: string;
+    audio: Buffer;
+    filename: string;
+    mimeType: string;
+    mutationId: string;
+  }): Promise<VoiceInterpretationJob> {
+    void input.authSubject;
+    void input.audio;
+    this.job ??= {
+      attempts: 0,
+      createdAt: '2026-09-03T00:00:00.000Z',
+      error: null,
+      id: input.mutationId,
+      interpretation: null,
+      mutationId: input.mutationId,
+      status: 'pending',
+      updatedAt: '2026-09-03T00:00:00.000Z',
+    };
+    return this.job;
+  }
+
+  async find(): Promise<VoiceInterpretationJob | null> {
+    return this.job;
+  }
+}
 
 class FakeVoiceInterpreter implements VoiceInterpreter {
   lastRequest: VoiceInterpretationRequest | undefined;
@@ -102,34 +183,38 @@ class FakeVoiceInterpreter implements VoiceInterpreter {
     request: VoiceInterpretationRequest,
   ): Promise<VoiceInterpretation> {
     this.lastRequest = request;
-    return {
-      ambiguities: [],
-      client: { name: 'Maria Silva', phone: '+5511999999999' },
-      conditions: {
-        executionDeadline: 'cinco dias úteis',
-        installmentCount: null,
-        notes: null,
-        paymentMethod: 'Pix',
-        paymentPlanType: 'integral',
-        validUntil: null,
-      },
-      createdAt: '2026-09-03T00:00:00.000Z',
-      discountInCents: null,
-      id: request.mutationId,
-      materials: [],
-      services: [
-        {
-          description: 'Troca de tomada',
-          quantity: '4',
-          unit: 'un',
-          unitPriceInCents: 5000,
-        },
-      ],
-      source: 'interpretation',
-      transcript: 'Trocar quatro tomadas para Maria Silva.',
-      transcriptSegments: [],
-    };
+    return fakeInterpretation(request.mutationId);
   }
+}
+
+function fakeInterpretation(mutationId: string): VoiceInterpretation {
+  return {
+    ambiguities: [],
+    client: { name: 'Maria Silva', phone: '+5511999999999' },
+    conditions: {
+      executionDeadline: 'cinco dias úteis',
+      installmentCount: null,
+      notes: null,
+      paymentMethod: 'Pix',
+      paymentPlanType: 'integral',
+      validUntil: null,
+    },
+    createdAt: '2026-09-03T00:00:00.000Z',
+    discountInCents: null,
+    id: mutationId,
+    materials: [],
+    services: [
+      {
+        description: 'Troca de tomada',
+        quantity: '4',
+        unit: 'un',
+        unitPriceInCents: 5000,
+      },
+    ],
+    source: 'interpretation',
+    transcript: 'Trocar quatro tomadas para Maria Silva.',
+    transcriptSegments: [],
+  };
 }
 
 function multipartBody(mutationId: string): Buffer {

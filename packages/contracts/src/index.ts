@@ -150,6 +150,27 @@ export const VoiceInterpretationSchema = Type.Object(
   { additionalProperties: false },
 );
 
+export const VoiceJobStatusSchema = Type.Union([
+  Type.Literal('pending'),
+  Type.Literal('processing'),
+  Type.Literal('completed'),
+  Type.Literal('failed'),
+]);
+
+export const VoiceInterpretationJobSchema = Type.Object(
+  {
+    id: Type.String({ format: 'uuid' }),
+    mutationId: Type.String({ format: 'uuid' }),
+    status: VoiceJobStatusSchema,
+    attempts: Type.Integer({ minimum: 0 }),
+    interpretation: Type.Union([VoiceInterpretationSchema, Type.Null()]),
+    error: NullableString,
+    createdAt: Type.String({ format: 'date-time' }),
+    updatedAt: Type.String({ format: 'date-time' }),
+  },
+  { additionalProperties: false },
+);
+
 export const ApiErrorSchema = Type.Object({
   error: Type.Object({
     code: Type.String(),
@@ -162,3 +183,7 @@ export type PaymentPlanType = Static<typeof PaymentPlanTypeSchema>;
 export type QuoteDraft = Static<typeof QuoteDraftSchema>;
 export type QuoteLineInput = Static<typeof QuoteLineInputSchema>;
 export type VoiceInterpretation = Static<typeof VoiceInterpretationSchema>;
+export type VoiceInterpretationJob = Static<
+  typeof VoiceInterpretationJobSchema
+>;
+export type VoiceJobStatus = Static<typeof VoiceJobStatusSchema>;

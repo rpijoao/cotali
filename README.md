@@ -35,6 +35,7 @@ Para habilitar o processamento por voz no backend, configure `GROQ_API_KEY` em `
 pnpm dev:mobile
 pnpm dev:web
 pnpm dev:api
+pnpm dev:worker
 ```
 
 A API responde em `http://localhost:3333/v1/health` e publica a documentação em `http://localhost:3333/docs`.
@@ -60,7 +61,7 @@ O teste do adaptador PostgreSQL real é habilitado explicitamente com `RUN_DATAB
 
 ## Verificação
 
-O primeiro fluxo de voz usa `POST /v1/voice/interpretations` com multipart contendo `mutationId` (UUID) e `audio` (até 25 MB). A API autentica a requisição, transcreve e interpreta no Groq e devolve uma sugestão estruturada para revisão. O áudio é mantido apenas em memória durante a requisição; jobs duráveis, retries e outbox de voz ainda são etapas posteriores.
+O fluxo de voz usa `POST /v1/voice/interpretations` com multipart contendo `mutationId` (UUID) e `audio` (até 25 MB). A API autentica, grava um `VoiceJob` na branch Neon e responde `202` com o status `pending`. O worker (`pnpm dev:worker`) reclama jobs com lease, transcreve/interpreta no Groq, persiste o resultado e remove o áudio binário ao concluir. O app consulta `GET /v1/voice/interpretations/:mutationId` até receber `completed` ou `failed`. Retries usam a mesma chave e não duplicam o job.
 
 ```powershell
 pnpm lint

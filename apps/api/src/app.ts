@@ -4,6 +4,7 @@ import rateLimit from '@fastify/rate-limit';
 import swagger from '@fastify/swagger';
 import swaggerUi from '@fastify/swagger-ui';
 import Fastify from 'fastify';
+import type { VoiceJobRepository } from '@cotali/database';
 import type { Authenticator } from './auth/authenticator.js';
 import { registerQuoteRoutes } from './quotes/quote-routes.js';
 import type { QuoteService } from './quotes/quote-service.js';
@@ -18,6 +19,7 @@ export async function buildApp(options: {
   quoteService: QuoteService;
   rateLimitMax?: number;
   voiceInterpreter?: VoiceInterpreter | undefined;
+  voiceJobRepository?: VoiceJobRepository | undefined;
 }) {
   const app = Fastify({
     bodyLimit: 1_048_576,
@@ -61,6 +63,7 @@ export async function buildApp(options: {
     app,
     options.authenticator,
     options.voiceInterpreter,
+    options.voiceJobRepository,
   );
 
   app.get(

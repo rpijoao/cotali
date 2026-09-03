@@ -14,6 +14,7 @@
     "@cotali/contracts": "workspace:*",
     "@cotali/database": "workspace:*",
     "@cotali/domain": "workspace:*",
+    "@cotali/voice": "workspace:*",
     "@fastify/helmet": "^13.1.1",
     "@fastify/multipart": "^10.1.1",
     "@fastify/rate-limit": "^11.2.0",
@@ -23,7 +24,6 @@
     "@sinclair/typebox": "0.34.52",
     "dotenv": "^17.3.1",
     "fastify": "5.12.1",
-    "groq-sdk": "^1.6.0",
     "jose": "^6.1.3"
   },
   "devDependencies": {

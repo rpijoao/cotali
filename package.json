@@ -12,6 +12,7 @@
     "dev": "turbo run dev",
     "dev:api": "pnpm --filter @cotali/api dev",
     "dev:mobile": "pnpm --filter @cotali/mobile dev",
+    "dev:worker": "pnpm --filter @cotali/worker dev",
     "dev:web": "pnpm --filter @cotali/web dev",
     "format": "prettier --write .",
     "format:check": "prettier --check .",

@@ -1,5 +1,13 @@
-import { ApiErrorSchema, VoiceInterpretationSchema } from '@cotali/contracts';
-import type { FastifyInstance } from 'fastify';
+import {
+  ApiErrorSchema,
+  VoiceInterpretationJobSchema,
+  VoiceInterpretationSchema,
+} from '@cotali/contracts';
+import type {
+  EnqueueVoiceJobInput,
+  VoiceJobRepository,
+} from '@cotali/database';
+import type { FastifyInstance, FastifyRequest } from 'fastify';
 import {
   AuthenticationError,
   type Authenticator,
@@ -9,7 +17,7 @@ import {
   type VoiceInterpreter,
 } from './groq-voice-interpreter.js';
 
-const MAX_AUDIO_BYTES = 25 * 1024 * 1024;
+export const MAX_AUDIO_BYTES = 25 * 1024 * 1024;
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -17,13 +25,16 @@ export async function registerVoiceRoutes(
   app: FastifyInstance,
   authenticator: Authenticator,
   voiceInterpreter?: VoiceInterpreter,
+  voiceJobs?: VoiceJobRepository,
 ) {
   app.post('/v1/voice/interpretations', {
     bodyLimit: MAX_AUDIO_BYTES,
     schema: {
       response: {
         201: VoiceInterpretationSchema,
+        202: VoiceInterpretationJobSchema,
         401: ApiErrorSchema,
+        409: ApiErrorSchema,
         413: ApiErrorSchema,
         422: ApiErrorSchema,
         503: ApiErrorSchema,
@@ -35,9 +46,8 @@ export async function registerVoiceRoutes(
         const identity = await authenticator.authenticate(
           request.headers.authorization,
         );
-        void identity;
 
-        if (!voiceInterpreter) {
+        if (!voiceJobs && !voiceInterpreter) {
           return await reply.status(503).send({
             error: {
               code: 'VOICE_NOT_CONFIGURED',
@@ -46,74 +56,26 @@ export async function registerVoiceRoutes(
           });
         }
 
-        let mutationId: string | null = null;
-        let audio: Buffer | null = null;
-        let filename = 'cotali-recording.m4a';
-        let mimeType = 'audio/m4a';
-
-        try {
-          for await (const part of request.parts()) {
-            if (part.type === 'file') {
-              if (audio) {
-                return await reply.status(422).send({
-                  error: {
-                    code: 'TOO_MANY_AUDIO_FILES',
-                    message: 'Envie apenas um arquivo de áudio.',
-                  },
-                });
-              }
-              filename = part.filename || filename;
-              mimeType = part.mimetype || mimeType;
-              audio = await part.toBuffer();
-            } else if (part.fieldname === 'mutationId') {
-              mutationId = String(part.value);
-            }
-          }
-        } catch (error) {
-          if (isFileTooLargeError(error)) {
-            return await reply.status(413).send({
-              error: {
-                code: 'AUDIO_TOO_LARGE',
-                message: 'O áudio deve ter no máximo 25 MB.',
-              },
-            });
-          }
-          throw error;
+        const payload = await readAudioPayload(request);
+        if ('error' in payload) {
+          return await reply
+            .status(payload.status)
+            .send({ error: payload.error });
         }
 
-        if (!mutationId || !UUID_PATTERN.test(mutationId)) {
-          return await reply.status(422).send({
-            error: {
-              code: 'INVALID_MUTATION_ID',
-              message: 'mutationId deve ser um UUID válido.',
-            },
+        if (voiceJobs) {
+          const job = await voiceJobs.enqueue({
+            ...payload,
+            authSubject: identity.subject,
           });
-        }
-        if (!audio || audio.byteLength === 0) {
-          return await reply.status(422).send({
-            error: {
-              code: 'AUDIO_REQUIRED',
-              message: 'Envie uma gravação de áudio.',
-            },
-          });
-        }
-        if (
-          !mimeType.startsWith('audio/') &&
-          mimeType !== 'application/octet-stream'
-        ) {
-          return await reply.status(422).send({
-            error: {
-              code: 'UNSUPPORTED_AUDIO_TYPE',
-              message: 'Envie um arquivo de áudio compatível.',
-            },
-          });
+          return await reply.status(202).send(job);
         }
 
-        const interpretation = await voiceInterpreter.interpret({
-          audio,
-          filename,
-          mimeType,
-          mutationId,
+        const interpretation = await voiceInterpreter!.interpret({
+          audio: payload.audio,
+          filename: payload.filename,
+          mimeType: payload.mimeType,
+          mutationId: payload.mutationId,
         });
         return await reply.status(201).send(interpretation);
       } catch (error) {
@@ -127,10 +89,167 @@ export async function registerVoiceRoutes(
             error: { code: 'VOICE_PROCESSING_FAILED', message: error.message },
           });
         }
+        if (isVoiceJobConflictError(error)) {
+          return await reply.status(409).send({
+            error: {
+              code: 'MUTATION_ID_REUSED',
+              message: 'O mutationId já foi usado com outro áudio.',
+            },
+          });
+        }
         throw error;
       }
     },
   });
+
+  app.get<{ Params: { mutationId: string } }>(
+    '/v1/voice/interpretations/:mutationId',
+    {
+      schema: {
+        params: {
+          type: 'object',
+          additionalProperties: false,
+          required: ['mutationId'],
+          properties: { mutationId: { type: 'string' } },
+        },
+        response: {
+          200: VoiceInterpretationJobSchema,
+          401: ApiErrorSchema,
+          404: ApiErrorSchema,
+          422: ApiErrorSchema,
+          503: ApiErrorSchema,
+        },
+        tags: ['voice'],
+      },
+      handler: async (request, reply) => {
+        try {
+          const identity = await authenticator.authenticate(
+            request.headers.authorization,
+          );
+          if (!voiceJobs) {
+            return await reply.status(503).send({
+              error: {
+                code: 'VOICE_NOT_DURABLE',
+                message: 'O status durável de voz ainda não foi configurado.',
+              },
+            });
+          }
+          if (!UUID_PATTERN.test(request.params.mutationId)) {
+            return await reply.status(422).send({
+              error: {
+                code: 'INVALID_MUTATION_ID',
+                message: 'mutationId deve ser um UUID válido.',
+              },
+            });
+          }
+          const job = await voiceJobs.find(
+            identity.subject,
+            request.params.mutationId,
+          );
+          if (!job) {
+            return await reply.status(404).send({
+              error: {
+                code: 'VOICE_JOB_NOT_FOUND',
+                message: 'Processamento de voz não encontrado.',
+              },
+            });
+          }
+          return await reply.status(200).send(job);
+        } catch (error) {
+          if (error instanceof AuthenticationError) {
+            return await reply.status(401).send({
+              error: {
+                code: 'AUTHENTICATION_REQUIRED',
+                message: error.message,
+              },
+            });
+          }
+          throw error;
+        }
+      },
+    },
+  );
+}
+
+type AudioPayload = Omit<EnqueueVoiceJobInput, 'authSubject'>;
+
+type AudioReadError = {
+  error: { code: string; message: string };
+  status: 413 | 422;
+};
+
+async function readAudioPayload(
+  request: FastifyRequest,
+): Promise<AudioPayload | AudioReadError> {
+  let mutationId: string | null = null;
+  let audio: Buffer | null = null;
+  let filename = 'cotali-recording.m4a';
+  let mimeType = 'audio/m4a';
+
+  try {
+    for await (const part of request.parts()) {
+      if (part.type === 'file') {
+        if (audio) {
+          return {
+            error: {
+              code: 'TOO_MANY_AUDIO_FILES',
+              message: 'Envie apenas um arquivo de áudio.',
+            },
+            status: 422,
+          };
+        }
+        filename = part.filename || filename;
+        mimeType = part.mimetype || mimeType;
+        audio = await part.toBuffer();
+      } else if (part.fieldname === 'mutationId') {
+        mutationId = String(part.value);
+      }
+    }
+  } catch (error) {
+    if (isFileTooLargeError(error)) {
+      return {
+        error: {
+          code: 'AUDIO_TOO_LARGE',
+          message: 'O áudio deve ter no máximo 25 MB.',
+        },
+        status: 413,
+      };
+    }
+    throw error;
+  }
+
+  if (!mutationId || !UUID_PATTERN.test(mutationId)) {
+    return {
+      error: {
+        code: 'INVALID_MUTATION_ID',
+        message: 'mutationId deve ser um UUID válido.',
+      },
+      status: 422,
+    };
+  }
+  if (!audio || audio.byteLength === 0) {
+    return {
+      error: {
+        code: 'AUDIO_REQUIRED',
+        message: 'Envie uma gravação de áudio.',
+      },
+      status: 422,
+    };
+  }
+  if (
+    !mimeType.startsWith('audio/') &&
+    mimeType !== 'application/octet-stream'
+  ) {
+    return {
+      error: {
+        code: 'UNSUPPORTED_AUDIO_TYPE',
+        message: 'Envie um arquivo de áudio compatível.',
+      },
+      status: 422,
+    };
+  }
+
+  return { audio, filename, mimeType, mutationId };
 }
 
 function isFileTooLargeError(error: unknown): boolean {
@@ -141,4 +260,6 @@ function isFileTooLargeError(error: unknown): boolean {
   );
 }
 
-export { MAX_AUDIO_BYTES };
+function isVoiceJobConflictError(error: unknown): boolean {
+  return error instanceof Error && error.name === 'VoiceJobConflictError';
+}

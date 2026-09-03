@@ -32,12 +32,20 @@ enum PaymentPlanType {
   INSTALLMENTS
 }
 
+enum VoiceJobStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
 model Account {
   id          String       @id @default(uuid()) @db.Uuid
   authSubject String       @unique @map("auth_subject")
   clients     Client[]
   quotes      Quote[]
   mutations   Mutation[]
+  voiceJobs   VoiceJob[]
   createdAt   DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt   DateTime     @updatedAt @map("updated_at") @db.Timestamptz(3)
 
@@ -153,4 +161,30 @@ model Mutation {
 
   @@unique([accountId, mutationId])
   @@map("mutations")
+}
+
+model VoiceJob {
+  id            String        @id @default(uuid()) @db.Uuid
+  accountId     String        @map("account_id") @db.Uuid
+  account       Account       @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  mutationId    String        @map("mutation_id") @db.Uuid
+  fingerprint   String        @db.Char(64)
+  status        VoiceJobStatus @default(PENDING)
+  attempts      Int           @default(0)
+  audioBytes    Bytes?        @map("audio_bytes") @db.ByteA
+  filename      String        @db.VarChar(255)
+  mimeType      String        @map("mime_type") @db.VarChar(100)
+  interpretation Json?
+  errorMessage  String?       @map("error_message") @db.VarChar(2000)
+  availableAt   DateTime      @default(now()) @map("available_at") @db.Timestamptz(3)
+  lockedAt      DateTime?     @map("locked_at") @db.Timestamptz(3)
+  lockedBy      String?       @map("locked_by") @db.VarChar(120)
+  startedAt     DateTime?     @map("started_at") @db.Timestamptz(3)
+  completedAt   DateTime?     @map("completed_at") @db.Timestamptz(3)
+  createdAt     DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt     DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@unique([accountId, mutationId])
+  @@index([status, availableAt])
+  @@map("voice_jobs")
 }

@@ -18,9 +18,11 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
+    "@cotali/contracts": "workspace:*",
     "@prisma/client": "6.19.3"
   },
   "devDependencies": {
+    "dotenv": "^17.3.1",
     "prisma": "6.19.3",
     "typescript": "5.9.3",
     "vitest": "^4.1.2"
