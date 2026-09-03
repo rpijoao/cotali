@@ -1,4 +1,4 @@
-import type { CreateQuoteDraft } from '@cotali/contracts';
+import type { CreateQuoteDraft, VoiceInterpretation } from '@cotali/contracts';
 import {
   calculateLineTotalInCents,
   calculateQuoteTotals,
@@ -18,13 +18,17 @@ import {
   View,
 } from 'react-native';
 import { formatBrl, formatBrlInput, parseBrlInput } from './money';
-import { createQuoteDraft } from './quote-api';
+import { createQuoteDraft, interpretQuoteVoice } from './quote-api';
 import {
   clearLocalQuoteDraft,
   loadLocalQuoteDraft,
   saveLocalQuoteDraft,
 } from './quote-draft-storage';
-import type { LocalQuoteDraft, PaymentPlan } from './quote-draft-state';
+import type {
+  LocalQuoteDraft,
+  PaymentPlan,
+  QuoteSource,
+} from './quote-draft-state';
 import { QuoteLineEditor, type EditableQuoteLine } from './QuoteLineEditor';
 import {
   VoiceCaptureCard,
@@ -46,6 +50,7 @@ export function QuoteDraftScreen() {
   const [discount, setDiscount] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('Pix');
   const [paymentPlan, setPaymentPlan] = useState<PaymentPlan>('integral');
+  const [source, setSource] = useState<QuoteSource>('manual');
   const [installmentCount, setInstallmentCount] = useState('2');
   const [executionDeadline, setExecutionDeadline] = useState('');
   const [notes, setNotes] = useState('');
@@ -57,6 +62,9 @@ export function QuoteDraftScreen() {
     'error' | 'pending' | 'saved'
   >('pending');
   const [recording, setRecording] = useState<CapturedRecording | null>(null);
+  const [voiceStatus, setVoiceStatus] = useState<
+    'failed' | 'idle' | 'processing' | 'ready'
+  >('idle');
   const [pendingSubmission, setPendingSubmission] =
     useState<CreateQuoteDraft | null>(null);
 
@@ -72,6 +80,7 @@ export function QuoteDraftScreen() {
       notes,
       paymentMethod,
       paymentPlan,
+      source,
       services,
       version: 1,
     }),
@@ -86,6 +95,7 @@ export function QuoteDraftScreen() {
       notes,
       paymentMethod,
       paymentPlan,
+      source,
       services,
     ],
   );
@@ -105,6 +115,7 @@ export function QuoteDraftScreen() {
         setNotes(draft.notes);
         setPaymentMethod(draft.paymentMethod);
         setPaymentPlan(draft.paymentPlan);
+        setSource(draft.source);
         setServices(draft.services);
       })
       .catch(() => setPersistenceStatus('error'))
@@ -202,6 +213,62 @@ export function QuoteDraftScreen() {
     }
   }
 
+  async function processRecording() {
+    if (!recording) return;
+    setVoiceStatus('processing');
+    try {
+      const interpretation = await interpretQuoteVoice({
+        mutationId,
+        uri: recording.uri,
+      });
+      applyInterpretation(interpretation);
+      setVoiceStatus('ready');
+      const ambiguityMessage = interpretation.ambiguities.length
+        ? ` Revise: ${interpretation.ambiguities.join(' ')}`
+        : '';
+      Alert.alert(
+        'Áudio processado',
+        `Confira os dados extraídos antes de salvar.${ambiguityMessage}`,
+      );
+    } catch (error) {
+      setVoiceStatus('failed');
+      Alert.alert(
+        'Não foi possível processar',
+        error instanceof Error
+          ? error.message
+          : 'Verifique a conexão e tente novamente.',
+      );
+    }
+  }
+
+  function applyInterpretation(interpretation: VoiceInterpretation) {
+    setSource('interpretation');
+    setClientName(interpretation.client.name ?? '');
+    setClientPhone(interpretation.client.phone ?? '');
+    setServices(
+      interpretation.services.length
+        ? interpretation.services.map(toEditableLine)
+        : [emptyLine()],
+    );
+    setMaterials(interpretation.materials.map(toEditableLine));
+    setPaymentMethod(interpretation.conditions.paymentMethod ?? '');
+    if (interpretation.conditions.paymentPlanType) {
+      setPaymentPlan(interpretation.conditions.paymentPlanType);
+    }
+    setInstallmentCount(
+      interpretation.conditions.installmentCount === null
+        ? ''
+        : String(interpretation.conditions.installmentCount),
+    );
+    setExecutionDeadline(interpretation.conditions.executionDeadline ?? '');
+    setNotes(interpretation.conditions.notes ?? '');
+    setDiscount(
+      interpretation.discountInCents === null
+        ? ''
+        : String(interpretation.discountInCents),
+    );
+  }
+
   function buildSubmission(): CreateQuoteDraft {
     return {
       client: { name: clientName.trim(), phone: normalizePhone(clientPhone) },
@@ -218,7 +285,7 @@ export function QuoteDraftScreen() {
       materials: materials.map(toDomainLine),
       mutationId,
       services: services.map(toDomainLine),
-      source: 'manual',
+      source,
     };
   }
 
@@ -230,6 +297,7 @@ export function QuoteDraftScreen() {
     setDiscount('');
     setPaymentMethod('Pix');
     setPaymentPlan('integral');
+    setSource('manual');
     setInstallmentCount('2');
     setExecutionDeadline('');
     setNotes('');
@@ -322,7 +390,14 @@ export function QuoteDraftScreen() {
         <Text style={styles.subtitle}>
           Fale uma vez ou preencha manualmente.
         </Text>
-        <VoiceCaptureCard onRecordingChange={setRecording} />
+        <VoiceCaptureCard
+          onProcess={processRecording}
+          onRecordingChange={(next) => {
+            setRecording(next);
+            if (!next) setVoiceStatus('idle');
+          }}
+          processing={voiceStatus === 'processing'}
+        />
         <Text
           style={
             persistenceStatus === 'error'
@@ -338,8 +413,13 @@ export function QuoteDraftScreen() {
         </Text>
         {recording && (
           <Text style={styles.recordingStatus}>
-            Áudio capturado. O envio para interpretação será habilitado no
-            próximo corte do fluxo de voz.
+            {voiceStatus === 'processing'
+              ? 'Enviando e interpretando o áudio…'
+              : voiceStatus === 'ready'
+                ? 'Interpretação recebida. Revise os campos antes de salvar.'
+                : voiceStatus === 'failed'
+                  ? 'O processamento falhou. Você pode tentar novamente.'
+                  : 'Áudio capturado. Toque em Processar áudio para preencher o rascunho.'}
           </Text>
         )}
         <Section title="Cliente">
@@ -583,6 +663,16 @@ function toDomainLine(line: EditableQuoteLine) {
     quantity: line.quantity,
     unit: line.unit.trim() || null,
     unitPriceInCents: parseBrlInput(line.unitPrice),
+  };
+}
+
+function toEditableLine(line: VoiceInterpretation['services'][number]) {
+  return {
+    description: line.description,
+    quantity: line.quantity ?? '',
+    unit: line.unit ?? '',
+    unitPrice:
+      line.unitPriceInCents === null ? '' : String(line.unitPriceInCents),
   };
 }
 

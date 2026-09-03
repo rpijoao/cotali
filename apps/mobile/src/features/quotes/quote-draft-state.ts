@@ -1,6 +1,7 @@
 import type { EditableQuoteLine } from './QuoteLineEditor';
 
 export type PaymentPlan = 'installments' | 'integral' | 'partial';
+export type QuoteSource = 'interpretation' | 'manual' | 'mixed';
 
 export type LocalQuoteDraft = Readonly<{
   clientName: string;
@@ -13,6 +14,7 @@ export type LocalQuoteDraft = Readonly<{
   notes: string;
   paymentMethod: string;
   paymentPlan: PaymentPlan;
+  source: QuoteSource;
   services: EditableQuoteLine[];
   version: 1;
 }>;
@@ -23,6 +25,7 @@ export function parseLocalQuoteDraft(value: string): LocalQuoteDraft | null {
     if (!isRecord(candidate) || candidate.version !== 1) return null;
     if (!isNonEmptyString(candidate.mutationId)) return null;
     if (!isPaymentPlan(candidate.paymentPlan)) return null;
+    if (!isQuoteSource(candidate.source)) return null;
     if (
       !isQuoteLines(candidate.services) ||
       !isQuoteLines(candidate.materials)
@@ -67,6 +70,10 @@ function isPaymentPlan(value: unknown): value is PaymentPlan {
   return (
     value === 'installments' || value === 'integral' || value === 'partial'
   );
+}
+
+function isQuoteSource(value: unknown): value is QuoteSource {
+  return value === 'interpretation' || value === 'manual' || value === 'mixed';
 }
 
 function isNonEmptyString(value: unknown): value is string {

@@ -90,6 +90,66 @@ export const QuoteDraftSchema = Type.Intersect([
   }),
 ]);
 
+const NullableString = Type.Union([Type.String(), Type.Null()]);
+
+export const VoiceLineProposalSchema = Type.Object(
+  {
+    description: Type.String({ minLength: 1, maxLength: 160 }),
+    quantity: NullableString,
+    unit: Type.Union([
+      Type.String({ minLength: 1, maxLength: 20 }),
+      Type.Null(),
+    ]),
+    unitPriceInCents: Type.Union([Type.Integer({ minimum: 0 }), Type.Null()]),
+  },
+  { additionalProperties: false },
+);
+
+export const VoiceInterpretationSchema = Type.Object(
+  {
+    id: Type.String({ format: 'uuid' }),
+    transcript: Type.String({ minLength: 1, maxLength: 50_000 }),
+    transcriptSegments: Type.Array(
+      Type.Object(
+        {
+          text: Type.String({ minLength: 1, maxLength: 2_000 }),
+          startMs: Type.Integer({ minimum: 0 }),
+          endMs: Type.Integer({ minimum: 0 }),
+        },
+        { additionalProperties: false },
+      ),
+      { maxItems: 2_000 },
+    ),
+    client: Type.Object(
+      { name: NullableString, phone: NullableString },
+      { additionalProperties: false },
+    ),
+    services: Type.Array(VoiceLineProposalSchema, { maxItems: 5 }),
+    materials: Type.Array(VoiceLineProposalSchema, { maxItems: 10 }),
+    conditions: Type.Object(
+      {
+        paymentMethod: NullableString,
+        paymentPlanType: Type.Union([PaymentPlanTypeSchema, Type.Null()]),
+        installmentCount: Type.Union([
+          Type.Integer({ minimum: 2, maximum: 24 }),
+          Type.Null(),
+        ]),
+        executionDeadline: NullableString,
+        validUntil: Type.Union([Type.String({ format: 'date' }), Type.Null()]),
+        notes: NullableString,
+      },
+      { additionalProperties: false },
+    ),
+    discountInCents: Type.Union([Type.Integer({ minimum: 0 }), Type.Null()]),
+    ambiguities: Type.Array(Type.String({ minLength: 1, maxLength: 500 }), {
+      maxItems: 32,
+    }),
+    source: Type.Literal('interpretation'),
+    createdAt: Type.String({ format: 'date-time' }),
+  },
+  { additionalProperties: false },
+);
+
 export const ApiErrorSchema = Type.Object({
   error: Type.Object({
     code: Type.String(),
@@ -101,3 +161,4 @@ export type CreateQuoteDraft = Static<typeof CreateQuoteDraftSchema>;
 export type PaymentPlanType = Static<typeof PaymentPlanTypeSchema>;
 export type QuoteDraft = Static<typeof QuoteDraftSchema>;
 export type QuoteLineInput = Static<typeof QuoteLineInputSchema>;
+export type VoiceInterpretation = Static<typeof VoiceInterpretationSchema>;

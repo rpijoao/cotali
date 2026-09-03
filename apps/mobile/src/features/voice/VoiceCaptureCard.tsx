@@ -17,9 +17,13 @@ export type CapturedRecording = Readonly<{
 }>;
 
 export function VoiceCaptureCard({
+  onProcess,
   onRecordingChange,
+  processing = false,
 }: Readonly<{
+  onProcess?: () => void;
   onRecordingChange?: (recording: CapturedRecording | null) => void;
+  processing?: boolean;
 }>) {
   const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
   const recorderState = useAudioRecorderState(recorder, 250);
@@ -169,9 +173,22 @@ export function VoiceCaptureCard({
         )}
       </View>
       {recording && !recorderState.isRecording && (
-        <Pressable disabled={busy} onPress={cancelRecording}>
-          <Text style={styles.removeText}>Remover gravação</Text>
-        </Pressable>
+        <>
+          {onProcess && (
+            <Pressable
+              disabled={busy || processing}
+              onPress={onProcess}
+              style={styles.processButton}
+            >
+              <Text style={styles.primaryText}>
+                {processing ? 'Processando…' : 'Processar áudio'}
+              </Text>
+            </Pressable>
+          )}
+          <Pressable disabled={busy || processing} onPress={cancelRecording}>
+            <Text style={styles.removeText}>Remover gravação</Text>
+          </Pressable>
+        </>
       )}
     </View>
   );
@@ -193,6 +210,12 @@ const styles = StyleSheet.create({
     letterSpacing: 1.4,
   },
   primaryText: { color: '#FFFFFF', fontSize: 15, fontWeight: '800' },
+  processButton: {
+    alignItems: 'center',
+    backgroundColor: '#2EAA76',
+    borderRadius: 14,
+    padding: 15,
+  },
   recordButton: {
     alignItems: 'center',
     backgroundColor: '#16875D',

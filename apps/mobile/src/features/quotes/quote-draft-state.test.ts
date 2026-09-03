@@ -12,6 +12,7 @@ const validDraft = {
   notes: '',
   paymentMethod: 'Pix',
   paymentPlan: 'integral',
+  source: 'manual',
   services: [
     {
       description: 'Instalação',

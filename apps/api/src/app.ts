@@ -1,4 +1,5 @@
 import helmet from '@fastify/helmet';
+import multipart from '@fastify/multipart';
 import rateLimit from '@fastify/rate-limit';
 import swagger from '@fastify/swagger';
 import swaggerUi from '@fastify/swagger-ui';
@@ -6,6 +7,9 @@ import Fastify from 'fastify';
 import type { Authenticator } from './auth/authenticator.js';
 import { registerQuoteRoutes } from './quotes/quote-routes.js';
 import type { QuoteService } from './quotes/quote-service.js';
+import { registerVoiceRoutes } from './voice/voice-routes.js';
+import type { VoiceInterpreter } from './voice/groq-voice-interpreter.js';
+import { MAX_AUDIO_BYTES } from './voice/voice-routes.js';
 
 export async function buildApp(options: {
   authenticator: Authenticator;
@@ -13,6 +17,7 @@ export async function buildApp(options: {
   logger?: boolean;
   quoteService: QuoteService;
   rateLimitMax?: number;
+  voiceInterpreter?: VoiceInterpreter | undefined;
 }) {
   const app = Fastify({
     bodyLimit: 1_048_576,
@@ -36,6 +41,9 @@ export async function buildApp(options: {
     max: options.rateLimitMax ?? 100,
     timeWindow: '1 minute',
   });
+  await app.register(multipart, {
+    limits: { fileSize: MAX_AUDIO_BYTES, files: 1, parts: 4 },
+  });
 
   if (options.docsEnabled ?? process.env.NODE_ENV !== 'production') {
     await app.register(swagger, {
@@ -49,6 +57,11 @@ export async function buildApp(options: {
     await app.register(swaggerUi, { routePrefix: '/docs' });
   }
   await registerQuoteRoutes(app, options.authenticator, options.quoteService);
+  await registerVoiceRoutes(
+    app,
+    options.authenticator,
+    options.voiceInterpreter,
+  );
 
   app.get(
     '/v1/health',

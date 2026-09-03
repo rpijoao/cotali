@@ -29,6 +29,8 @@ pnpm --filter @cotali/database db:migrate:deploy
 
 ## Desenvolvimento
 
+Para habilitar o processamento por voz no backend, configure `GROQ_API_KEY` em `apps/api/.env`. A chave nunca deve ser colocada em `apps/mobile/.env` ou enviada ao aplicativo. Os modelos padrão são `whisper-large-v3-turbo` para transcrição e `openai/gpt-oss-20b` para extração estruturada.
+
 ```powershell
 pnpm dev:mobile
 pnpm dev:web
@@ -57,6 +59,8 @@ Em desenvolvimento, use `Authorization: Bearer dev:local-user`. Esse modo é rec
 O teste do adaptador PostgreSQL real é habilitado explicitamente com `RUN_DATABASE_INTEGRATION=true`. Ele usa `TEST_DATABASE_URL` quando definida e, caso contrário, a `DATABASE_URL` de `apps/api/.env`.
 
 ## Verificação
+
+O primeiro fluxo de voz usa `POST /v1/voice/interpretations` com multipart contendo `mutationId` (UUID) e `audio` (até 25 MB). A API autentica a requisição, transcreve e interpreta no Groq e devolve uma sugestão estruturada para revisão. O áudio é mantido apenas em memória durante a requisição; jobs duráveis, retries e outbox de voz ainda são etapas posteriores.
 
 ```powershell
 pnpm lint

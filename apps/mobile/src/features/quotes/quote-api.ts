@@ -1,4 +1,8 @@
-import type { CreateQuoteDraft, QuoteDraft } from '@cotali/contracts';
+import type {
+  CreateQuoteDraft,
+  QuoteDraft,
+  VoiceInterpretation,
+} from '@cotali/contracts';
 
 const apiUrl = process.env.EXPO_PUBLIC_API_URL ?? 'http://10.0.2.2:3333';
 const developmentToken =
@@ -28,6 +32,38 @@ export async function createQuoteDraft(
   }
 
   return body as QuoteDraft;
+}
+
+export async function interpretQuoteVoice(input: {
+  mutationId: string;
+  uri: string;
+}): Promise<VoiceInterpretation> {
+  if (!developmentToken) {
+    throw new Error('A sessão autenticada ainda não foi configurada.');
+  }
+
+  const form = new FormData();
+  form.append('mutationId', input.mutationId);
+  form.append('audio', {
+    name: 'cotali-recording.m4a',
+    type: 'audio/m4a',
+    uri: input.uri,
+  } as unknown as Blob);
+
+  const response = await fetch(`${apiUrl}/v1/voice/interpretations`, {
+    body: form,
+    headers: { authorization: `Bearer ${developmentToken}` },
+    method: 'POST',
+  });
+  const body: unknown = await response.json();
+
+  if (!response.ok) {
+    throw new Error(
+      readApiMessage(body) ?? 'Não foi possível processar o áudio.',
+    );
+  }
+
+  return body as VoiceInterpretation;
 }
 
 function readApiMessage(value: unknown): string | null {
