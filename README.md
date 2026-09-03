@@ -1,5 +1,7 @@
 # Cotali
 
+A paleta oficial do Cotali é azul `#1846e1` e branco `#ffffff`. Consulte a [identidade visual](./docs/product/cotali-visual-identity.md) antes de criar ou alterar componentes de interface.
+
 Aplicativo mobile-first para profissionais autônomos criarem orçamentos por voz e compartilharem propostas e recibos em PDF.
 
 ## Requisitos
