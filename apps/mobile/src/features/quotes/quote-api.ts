@@ -4,6 +4,7 @@ import type {
   VoiceInterpretation,
   VoiceInterpretationJob,
 } from '@cotali/contracts';
+import { File } from 'expo-file-system';
 import { Platform } from 'react-native';
 
 const apiUrl = process.env.EXPO_PUBLIC_API_URL ?? 'http://10.0.2.2:3333';
@@ -77,11 +78,7 @@ async function appendAudioPart(form: FormData, uri: string): Promise<void> {
     return;
   }
 
-  form.append('audio', {
-    name: 'cotali-recording.m4a',
-    type: 'audio/m4a',
-    uri,
-  } as unknown as Blob);
+  form.append('audio', new File(uri), 'cotali-recording.m4a');
 }
 
 function audioFilename(mimeType: string): string {

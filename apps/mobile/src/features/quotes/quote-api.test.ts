@@ -1,6 +1,7 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
 vi.mock('react-native', () => ({ Platform: { OS: 'web' } }));
+vi.mock('expo-file-system', () => ({ File: class File {} }));
 
 const fetchMock = vi.fn();
 vi.stubGlobal('fetch', fetchMock);
