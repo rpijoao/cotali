@@ -1,6 +1,7 @@
 import {
   ApiErrorSchema,
   CreateQuoteDraftSchema,
+  QuoteSummaryListSchema,
   QuoteDraftSchema,
   type CreateQuoteDraft,
 } from '@cotali/contracts';
@@ -17,6 +18,34 @@ export async function registerQuoteRoutes(
   authenticator: Authenticator,
   quoteService: QuoteService,
 ) {
+  app.get(
+    '/v1/quotes',
+    {
+      schema: {
+        response: {
+          200: QuoteSummaryListSchema,
+          401: ApiErrorSchema,
+        },
+        tags: ['quotes'],
+      },
+    },
+    async (request, reply) => {
+      try {
+        const identity = await authenticator.authenticate(
+          request.headers.authorization,
+        );
+        return await quoteService.listRecent(identity.subject);
+      } catch (error) {
+        if (error instanceof AuthenticationError) {
+          return await reply.status(401).send({
+            error: { code: 'AUTHENTICATION_REQUIRED', message: error.message },
+          });
+        }
+        throw error;
+      }
+    },
+  );
+
   app.post<{ Body: CreateQuoteDraft }>(
     '/v1/quotes',
     {

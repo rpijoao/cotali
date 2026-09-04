@@ -94,17 +94,20 @@ export type CapturedRecording = Readonly<{
 }>;
 
 export function VoiceCaptureCard({
+  mode = 'quote',
+  recording,
   onProcess,
   onRecordingChange,
   processing = false,
 }: Readonly<{
+  mode?: 'edit' | 'quote';
+  recording: CapturedRecording | null;
   onProcess?: () => void;
   onRecordingChange?: (recording: CapturedRecording | null) => void;
   processing?: boolean;
 }>) {
   const recorder = useAudioRecorder(RECORDING_PRESET);
   const recorderState = useAudioRecorderState(recorder, 250);
-  const [recording, setRecording] = useState<CapturedRecording | null>(null);
   const [busy, setBusy] = useState(false);
   const [meterPulse, setMeterPulse] = useState(0);
   const [streamMetering, setStreamMetering] = useState<number | undefined>();
@@ -134,10 +137,6 @@ export function VoiceCaptureCard({
       }
     },
   });
-
-  useEffect(() => {
-    return () => stream.stop();
-  }, [stream]);
 
   useEffect(() => {
     if (androidRecordingStartedAt === null) {
@@ -213,7 +212,6 @@ export function VoiceCaptureCard({
         allowsRecording: true,
         playsInSilentMode: true,
       });
-      setRecording(null);
       onRecordingChange?.(null);
       pcmChunksRef.current = [];
       setStreamMetering(undefined);
@@ -232,9 +230,7 @@ export function VoiceCaptureCard({
           recorder.record();
         };
         try {
-          void stream.start().catch(() => {
-            void startRecorderFallback();
-          });
+          await stream.start();
         } catch {
           await startRecorderFallback();
         }
@@ -266,7 +262,6 @@ export function VoiceCaptureCard({
 
         if (pcmChunksRef.current.length === 0 || durationMs < 1_000) {
           pcmChunksRef.current = [];
-          setRecording(null);
           onRecordingChange?.(null);
           await setAudioModeAsync({ allowsRecording: false });
           Alert.alert(
@@ -283,7 +278,6 @@ export function VoiceCaptureCard({
         );
         pcmChunksRef.current = [];
         const captured = { durationMs, uri };
-        setRecording(captured);
         onRecordingChange?.(captured);
         await setAudioModeAsync({ allowsRecording: false });
         return;
@@ -291,7 +285,6 @@ export function VoiceCaptureCard({
 
       await recorder.stop();
       if (!recorder.uri || durationMs < 1_000) {
-        setRecording(null);
         onRecordingChange?.(null);
         Alert.alert(
           'Gravação muito curta',
@@ -301,7 +294,6 @@ export function VoiceCaptureCard({
       }
 
       const captured = { durationMs, uri: recorder.uri };
-      setRecording(captured);
       onRecordingChange?.(captured);
       await setAudioModeAsync({ allowsRecording: false });
     } catch {
@@ -327,7 +319,6 @@ export function VoiceCaptureCard({
       } else if (recorderState.isRecording) {
         await recorder.stop();
       }
-      setRecording(null);
       onRecordingChange?.(null);
       await setAudioModeAsync({ allowsRecording: false });
     } finally {
@@ -343,14 +334,20 @@ export function VoiceCaptureCard({
           ? 'Estou ouvindo…'
           : recording
             ? 'Áudio pronto para processar'
-            : 'Conte o serviço uma única vez'}
+            : mode === 'edit'
+              ? 'Diga o ajuste que você quer'
+              : 'Conte o serviço uma única vez'}
       </Text>
       <Text style={styles.description}>
         {isRecording
-          ? 'Diga cliente, serviços, materiais, preços, pagamento e prazo.'
+          ? mode === 'edit'
+            ? 'Diga qual linha deve mudar e informe o novo valor.'
+            : 'Diga cliente, serviços, materiais, preços, pagamento e prazo.'
           : recording
             ? `${formatDuration(recording.durationMs)} gravados. Você poderá revisar tudo antes de salvar.`
-            : 'Você terá até 2 minutos e sempre revisará as informações extraídas.'}
+            : mode === 'edit'
+              ? 'Exemplo: “altere o primeiro serviço para 3 unidades”.'
+              : 'Você terá até 2 minutos e sempre revisará as informações extraídas.'}
       </Text>
 
       {isRecording && (

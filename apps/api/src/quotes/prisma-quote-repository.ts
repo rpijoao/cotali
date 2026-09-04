@@ -2,6 +2,7 @@ import type {
   CreateQuoteDraft,
   QuoteDraft,
   QuoteLineInput,
+  QuoteSummary,
 } from '@cotali/contracts';
 import { Prisma, type PrismaClient } from '@cotali/database';
 import { calculateLineTotalInCents } from '@cotali/domain';
@@ -33,6 +34,34 @@ export class PrismaQuoteRepository implements QuoteRepository {
     }
 
     throw new Error('Unreachable transaction retry state.');
+  }
+
+  async listRecent(
+    authSubject: string,
+    limit: number,
+  ): Promise<QuoteSummary[]> {
+    const quotes = await this.prisma.quote.findMany({
+      include: {
+        client: true,
+        currentRevision: { select: { revisionNumber: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+      where: {
+        account: { authSubject },
+        deletedAt: null,
+      },
+    });
+
+    return quotes.map((quote) => ({
+      client: { name: quote.client.name, phone: quote.client.phone },
+      createdAt: quote.createdAt.toISOString(),
+      id: quote.id,
+      paymentStatus: mapPaymentStatus(quote.paymentStatus),
+      revisionNumber: quote.currentRevision?.revisionNumber ?? 1,
+      status: mapQuoteStatus(quote.status),
+      totalInCents: toSafeInteger(quote.totalCents),
+    }));
   }
 
   private async persist(input: PersistDraftInput): Promise<QuoteDraft> {
@@ -160,6 +189,32 @@ function mapSource(source: CreateQuoteDraft['source']) {
     mixed: 'MIXED',
   } as const;
   return values[source];
+}
+
+function mapQuoteStatus(status: string): QuoteSummary['status'] {
+  const values = {
+    DRAFT: 'draft',
+    READY_TO_SHARE: 'ready_to_share',
+    SHARED: 'shared',
+  } as const;
+  return values[status as keyof typeof values] ?? 'draft';
+}
+
+function mapPaymentStatus(status: string): QuoteSummary['paymentStatus'] {
+  const values = {
+    PAID: 'paid',
+    PARTIALLY_PAID: 'partially_paid',
+    PENDING: 'pending',
+  } as const;
+  return values[status as keyof typeof values] ?? 'pending';
+}
+
+function toSafeInteger(value: bigint): number {
+  const number = Number(value);
+  if (!Number.isSafeInteger(number) || number < 0) {
+    throw new Error('Quote total exceeds the supported money range.');
+  }
+  return number;
 }
 
 function nullableBigInt(value: number | null): bigint | null {

@@ -21,6 +21,9 @@ export type QuoteTotals = Readonly<{
 export type QuoteDomainErrorCode =
   | 'INVALID_MONEY_VALUE'
   | 'INVALID_QUANTITY'
+  | 'QUOTE_EDIT_INVALID_VALUE'
+  | 'QUOTE_EDIT_NO_CHANGES'
+  | 'QUOTE_EDIT_TARGET_NOT_FOUND'
   | 'QUOTE_LIMIT_MATERIALS_EXCEEDED'
   | 'QUOTE_LIMIT_SERVICES_EXCEEDED';
 
@@ -93,6 +96,135 @@ export function calculateLineTotalInCents(line: QuoteLineInput): number | null {
   }
 
   return Number(rounded);
+}
+
+export type QuoteLineEditCommand = Readonly<{
+  section: 'materials' | 'services';
+  index: number;
+  changes: Readonly<{
+    description?: string;
+    quantity?: string;
+    unit?: string | null;
+    unitPriceInCents?: number | null;
+  }>;
+}>;
+
+export type QuoteLineEditResult = Readonly<{
+  materials: readonly QuoteLineInput[];
+  services: readonly QuoteLineInput[];
+}>;
+
+/**
+ * Applies one normalized voice edit immutably. The LLM only proposes the
+ * command; this function is the authority that checks its target and values.
+ */
+export function applyQuoteLineEdit(input: {
+  materials: readonly QuoteLineInput[];
+  services: readonly QuoteLineInput[];
+  command: QuoteLineEditCommand;
+}): QuoteLineEditResult {
+  const { command } = input;
+  if (command.section !== 'services' && command.section !== 'materials') {
+    throw new QuoteDomainError(
+      'QUOTE_EDIT_INVALID_VALUE',
+      'A seção indicada pelo comando é inválida.',
+    );
+  }
+  if (!Number.isSafeInteger(command.index) || command.index < 0) {
+    throw new QuoteDomainError(
+      'QUOTE_EDIT_TARGET_NOT_FOUND',
+      'A linha indicada pelo comando não existe.',
+    );
+  }
+
+  const allowedChangeKeys = new Set([
+    'description',
+    'quantity',
+    'unit',
+    'unitPriceInCents',
+  ]);
+  const changeKeys = Object.keys(command.changes);
+  if (changeKeys.some((key) => !allowedChangeKeys.has(key))) {
+    throw new QuoteDomainError(
+      'QUOTE_EDIT_INVALID_VALUE',
+      'O comando contém um campo de alteração inválido.',
+    );
+  }
+  if (
+    !changeKeys.some(
+      (key) =>
+        command.changes[key as keyof typeof command.changes] !== undefined,
+    )
+  ) {
+    throw new QuoteDomainError(
+      'QUOTE_EDIT_NO_CHANGES',
+      'O comando não informou nenhuma alteração.',
+    );
+  }
+
+  const lines =
+    command.section === 'services' ? input.services : input.materials;
+  const current = lines[command.index];
+  if (!current) {
+    throw new QuoteDomainError(
+      'QUOTE_EDIT_TARGET_NOT_FOUND',
+      'A linha indicada pelo comando não existe.',
+    );
+  }
+
+  const changes = command.changes;
+  const next: QuoteLineInput = {
+    description:
+      changes.description !== undefined
+        ? changes.description
+        : current.description,
+    quantity:
+      changes.quantity !== undefined ? changes.quantity : current.quantity,
+    unit: changes.unit !== undefined ? changes.unit : current.unit,
+    unitPriceInCents:
+      changes.unitPriceInCents !== undefined
+        ? changes.unitPriceInCents
+        : current.unitPriceInCents,
+  };
+
+  assertEditableLine(next);
+  const updatedLines = lines.map((line, index) =>
+    index === command.index ? next : line,
+  );
+  const result =
+    command.section === 'services'
+      ? { services: updatedLines, materials: input.materials }
+      : { services: input.services, materials: updatedLines };
+
+  // Reuse the quote aggregate validation so a command cannot create a draft
+  // that later fails only when the user presses "Revisar".
+  calculateQuoteTotals({
+    discountInCents: 0,
+    materials: result.materials,
+    services: result.services,
+  });
+
+  return result;
+}
+
+function assertEditableLine(line: QuoteLineInput): void {
+  if (
+    typeof line.description !== 'string' ||
+    typeof line.quantity !== 'string' ||
+    (line.unit !== null && typeof line.unit !== 'string') ||
+    line.description.trim() === '' ||
+    line.description.length > 160 ||
+    (line.unit !== null && (line.unit.trim() === '' || line.unit.length > 20))
+  ) {
+    throw new QuoteDomainError(
+      'QUOTE_EDIT_INVALID_VALUE',
+      'A alteração contém uma descrição ou unidade inválida.',
+    );
+  }
+
+  // This validates quantity and unit price using the same exact arithmetic as
+  // quote totals, including the three-decimal quantity limit.
+  calculateLineTotalInCents(line);
 }
 
 function sumLines(lines: readonly QuoteLineInput[]): number {

@@ -9,7 +9,10 @@ import type { Authenticator } from './auth/authenticator.js';
 import { registerQuoteRoutes } from './quotes/quote-routes.js';
 import type { QuoteService } from './quotes/quote-service.js';
 import { registerVoiceRoutes } from './voice/voice-routes.js';
-import type { VoiceInterpreter } from './voice/groq-voice-interpreter.js';
+import type {
+  VoiceCommandInterpreter,
+  VoiceInterpreter,
+} from './voice/groq-voice-interpreter.js';
 import { MAX_AUDIO_BYTES } from './voice/voice-routes.js';
 
 export async function buildApp(options: {
@@ -19,6 +22,7 @@ export async function buildApp(options: {
   quoteService: QuoteService;
   rateLimitMax?: number;
   voiceInterpreter?: VoiceInterpreter | undefined;
+  voiceCommandInterpreter?: VoiceCommandInterpreter | undefined;
   voiceJobRepository?: VoiceJobRepository | undefined;
 }) {
   const app = Fastify({
@@ -64,6 +68,7 @@ export async function buildApp(options: {
     options.authenticator,
     options.voiceInterpreter,
     options.voiceJobRepository,
+    options.voiceCommandInterpreter,
   );
 
   app.get(

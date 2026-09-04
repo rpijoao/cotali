@@ -19,6 +19,24 @@ export type LocalQuoteDraft = Readonly<{
   version: 1;
 }>;
 
+export function hasLocalQuoteDraftContent(draft: LocalQuoteDraft): boolean {
+  return (
+    draft.clientName.trim() !== '' ||
+    draft.clientPhone.trim() !== '' ||
+    draft.discount.trim() !== '' ||
+    draft.executionDeadline.trim() !== '' ||
+    draft.installmentCount !== '2' ||
+    draft.materials.some(
+      (line) => line.description.trim() !== '' || line.unitPrice !== '',
+    ) ||
+    draft.notes.trim() !== '' ||
+    draft.services.some(
+      (line) => line.description.trim() !== '' || line.unitPrice !== '',
+    ) ||
+    draft.source === 'interpretation'
+  );
+}
+
 export function parseLocalQuoteDraft(value: string): LocalQuoteDraft | null {
   try {
     const candidate: unknown = JSON.parse(value);

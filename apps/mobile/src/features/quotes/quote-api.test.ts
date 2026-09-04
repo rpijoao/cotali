@@ -10,11 +10,12 @@ let interpretQuoteVoice: (input: {
   mutationId: string;
   uri: string;
 }) => Promise<unknown>;
+let listQuoteSummaries: () => Promise<unknown>;
 
 beforeAll(async () => {
   process.env.EXPO_PUBLIC_API_URL = 'http://localhost:3333';
   process.env.EXPO_PUBLIC_DEV_AUTH_TOKEN = 'dev:local-user';
-  ({ interpretQuoteVoice } = await import('./quote-api'));
+  ({ interpretQuoteVoice, listQuoteSummaries } = await import('./quote-api'));
 });
 
 afterEach(() => fetchMock.mockReset());
@@ -61,5 +62,42 @@ describe('interpretQuoteVoice on web', () => {
     expect(audio).toBeInstanceOf(Blob);
     expect(audio).toMatchObject({ name: 'cotali-recording.webm' });
     expect((audio as Blob).type).toBe('audio/webm;codecs=opus');
+  });
+});
+
+describe('listQuoteSummaries', () => {
+  it('loads the authenticated quote summaries', async () => {
+    const summaries = [
+      {
+        client: { name: 'Ana Maria', phone: null },
+        createdAt: '2026-09-04T12:00:00.000Z',
+        id: '9c6d3b5e-8f2a-4b18-9c3d-7a6e5f4b2c1d',
+        paymentStatus: 'pending',
+        revisionNumber: 1,
+        status: 'draft',
+        totalInCents: 15000,
+      },
+    ];
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => summaries,
+    });
+
+    await expect(listQuoteSummaries()).resolves.toEqual(summaries);
+    expect(fetchMock).toHaveBeenCalledWith('http://localhost:3333/v1/quotes', {
+      headers: { authorization: 'Bearer dev:local-user' },
+      method: 'GET',
+    });
+  });
+
+  it('rejects malformed API data', async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => [{ id: 'not-a-summary' }],
+    });
+
+    await expect(listQuoteSummaries()).rejects.toThrow(
+      'A API retornou uma lista de orçamentos inválida.',
+    );
   });
 });

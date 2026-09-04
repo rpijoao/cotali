@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
+    "benchmark:voice": "tsx src/voice-benchmark.ts",
     "check": "tsc --noEmit",
     "dev": "tsx watch src/main.ts",
     "start": "node dist/main.js",

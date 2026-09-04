@@ -1,5 +1,10 @@
-import type { CreateQuoteDraft, VoiceInterpretation } from '@cotali/contracts';
+import type {
+  CreateQuoteDraft,
+  VoiceQuoteEditInterpretation,
+  VoiceInterpretation,
+} from '@cotali/contracts';
 import {
+  applyQuoteLineEdit,
   calculateLineTotalInCents,
   calculateQuoteTotals,
   QuoteDomainError,
@@ -18,7 +23,11 @@ import {
   View,
 } from 'react-native';
 import { formatBrl, formatBrlInput, parseBrlInput } from './money';
-import { createQuoteDraft, interpretQuoteVoice } from './quote-api';
+import {
+  createQuoteDraft,
+  interpretQuoteEdit,
+  interpretQuoteVoice,
+} from './quote-api';
 import {
   clearLocalQuoteDraft,
   loadLocalQuoteDraft,
@@ -29,6 +38,7 @@ import type {
   PaymentPlan,
   QuoteSource,
 } from './quote-draft-state';
+import { hasLocalQuoteDraftContent } from './quote-draft-state';
 import { QuoteLineEditor, type EditableQuoteLine } from './QuoteLineEditor';
 import {
   VoiceCaptureCard,
@@ -42,7 +52,17 @@ const emptyLine = (): EditableQuoteLine => ({
   unitPrice: '',
 });
 
-export function QuoteDraftScreen() {
+type QuoteDraftStep = 'capture' | 'details';
+
+export function QuoteDraftScreen({
+  onBackToHome,
+  onSaved,
+  startFresh = false,
+}: Readonly<{
+  onBackToHome?: () => void;
+  onSaved?: () => void;
+  startFresh?: boolean;
+}>) {
   const [clientName, setClientName] = useState('');
   const [clientPhone, setClientPhone] = useState('');
   const [services, setServices] = useState<EditableQuoteLine[]>([emptyLine()]);
@@ -63,6 +83,22 @@ export function QuoteDraftScreen() {
     'error' | 'pending' | 'saved'
   >('pending');
   const [recording, setRecording] = useState<CapturedRecording | null>(null);
+  const [transcript, setTranscript] = useState<string | null>(null);
+  const [editRecording, setEditRecording] = useState<CapturedRecording | null>(
+    null,
+  );
+  const [editResult, setEditResult] =
+    useState<VoiceQuoteEditInterpretation | null>(null);
+  const [editMutationId, setEditMutationId] = useState(randomUUID);
+  const [editStatus, setEditStatus] = useState<
+    'failed' | 'idle' | 'processing' | 'ready'
+  >('idle');
+  const [lastEditUndo, setLastEditUndo] = useState<{
+    materials: EditableQuoteLine[];
+    services: EditableQuoteLine[];
+    source: QuoteSource;
+  } | null>(null);
+  const [step, setStep] = useState<QuoteDraftStep>('capture');
   const [voiceStatus, setVoiceStatus] = useState<
     'failed' | 'idle' | 'processing' | 'ready'
   >('idle');
@@ -103,6 +139,16 @@ export function QuoteDraftScreen() {
 
   useEffect(() => {
     let active = true;
+    if (startFresh) {
+      void clearLocalQuoteDraft()
+        .catch(() => setPersistenceStatus('error'))
+        .finally(() => {
+          if (active) setHydrated(true);
+        });
+      return () => {
+        active = false;
+      };
+    }
     void loadLocalQuoteDraft()
       .then((draft) => {
         if (!active || !draft) return;
@@ -118,6 +164,7 @@ export function QuoteDraftScreen() {
         setPaymentPlan(draft.paymentPlan);
         setSource(draft.source);
         setServices(draft.services);
+        if (hasLocalQuoteDraftContent(draft)) setStep('details');
       })
       .catch(() => setPersistenceStatus('error'))
       .finally(() => {
@@ -126,7 +173,7 @@ export function QuoteDraftScreen() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [startFresh]);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -202,6 +249,7 @@ export function QuoteDraftScreen() {
       );
       await clearLocalQuoteDraft();
       resetForm();
+      onSaved?.();
     } catch (error) {
       Alert.alert(
         'Não foi possível salvar',
@@ -227,6 +275,7 @@ export function QuoteDraftScreen() {
         mutationId: requestMutationId,
         uri: recording.uri,
       });
+      setTranscript(interpretation.transcript);
       applyInterpretation(interpretation);
       setVoiceStatus('ready');
       const ambiguityMessage = interpretation.ambiguities.length
@@ -247,8 +296,138 @@ export function QuoteDraftScreen() {
     }
   }
 
+  async function processEditRecording() {
+    if (!editRecording) return;
+    setEditStatus('processing');
+    try {
+      const result = await interpretQuoteEdit({
+        draft: {
+          materials: materials.map(toEditContextLine),
+          services: services.map(toEditContextLine),
+        },
+        mutationId: editMutationId,
+        uri: editRecording.uri,
+      });
+      setEditResult(result);
+      setEditStatus('ready');
+      Alert.alert(
+        result.command.intent === 'no_op'
+          ? 'Comando não identificado'
+          : 'Alteração sugerida',
+        result.command.ambiguities.length
+          ? result.command.ambiguities.join(' ')
+          : 'Confira a alteração e toque em aplicar para confirmar.',
+      );
+    } catch (error) {
+      setEditStatus('failed');
+      Alert.alert(
+        'Não foi possível processar',
+        error instanceof Error
+          ? error.message
+          : 'Verifique a conexão e tente novamente.',
+      );
+    }
+  }
+
+  function applyEditCommand() {
+    const command = editResult?.command;
+    if (!command || command.intent !== 'update_line') {
+      Alert.alert(
+        'Comando não aplicado',
+        'Diga qual serviço ou material deve ser alterado e tente novamente.',
+      );
+      return;
+    }
+    if (
+      command.section === null ||
+      command.index === null ||
+      command.ambiguities.length > 0
+    ) {
+      Alert.alert(
+        'Preciso de mais detalhes',
+        command.ambiguities.join(' ') ||
+          'Não foi possível identificar uma única linha com segurança.',
+      );
+      return;
+    }
+
+    try {
+      const previous = { materials, services, source };
+      const result = applyQuoteLineEdit({
+        materials: materials.map(toDomainLine),
+        services: services.map(toDomainLine),
+        command: {
+          section: command.section,
+          index: command.index,
+          changes: {
+            ...(command.changes.description !== null
+              ? { description: command.changes.description }
+              : {}),
+            ...(command.changes.quantity !== null
+              ? { quantity: command.changes.quantity }
+              : {}),
+            ...(command.changes.unit !== null
+              ? { unit: command.changes.unit }
+              : {}),
+            ...(command.changes.unitPriceInCents !== null
+              ? { unitPriceInCents: command.changes.unitPriceInCents }
+              : {}),
+          },
+        },
+      });
+      setServices(result.services.map(toEditableLine));
+      setMaterials(result.materials.map(toEditableLine));
+      setLastEditUndo(previous);
+      setSource('mixed');
+      setEditRecording(null);
+      setEditResult(null);
+      setEditMutationId(randomUUID());
+      setEditStatus('idle');
+      Alert.alert('Alteração aplicada', 'Confira os dados antes de revisar.');
+    } catch (error) {
+      Alert.alert(
+        'Alteração não aplicada',
+        error instanceof QuoteDomainError || error instanceof Error
+          ? error.message
+          : 'Revise o comando e tente novamente.',
+      );
+    }
+  }
+
+  function undoLastEdit() {
+    if (!lastEditUndo) return;
+    setServices(lastEditUndo.services);
+    setMaterials(lastEditUndo.materials);
+    setSource(lastEditUndo.source);
+    setLastEditUndo(null);
+    Alert.alert('Alteração desfeita', 'O rascunho voltou ao estado anterior.');
+  }
+
+  function openManualDetails() {
+    setSource('manual');
+    setStep('details');
+  }
+
+  function returnToCapture() {
+    setStep('capture');
+  }
+
+  function resetVoiceCapture() {
+    setRecording(null);
+    setTranscript(null);
+    setEditRecording(null);
+    setEditResult(null);
+    setEditMutationId(randomUUID());
+    setEditStatus('idle');
+    setLastEditUndo(null);
+    setVoiceMutationId(randomUUID());
+    setVoiceStatus('idle');
+    setStep('capture');
+  }
+
   function applyInterpretation(interpretation: VoiceInterpretation) {
     setSource('interpretation');
+    setLastEditUndo(null);
     setClientName(interpretation.client.name ?? '');
     setClientPhone(interpretation.client.phone ?? '');
     setServices(
@@ -310,12 +489,26 @@ export function QuoteDraftScreen() {
     setMutationId(randomUUID());
     setPendingSubmission(null);
     setRecording(null);
+    setTranscript(null);
+    setEditRecording(null);
+    setEditResult(null);
+    setEditMutationId(randomUUID());
+    setEditStatus('idle');
+    setLastEditUndo(null);
+    setVoiceMutationId(randomUUID());
+    setVoiceStatus('idle');
+    setStep('capture');
     setReviewing(false);
   }
 
   if (reviewing && totals) {
     return (
       <ScrollView contentContainerStyle={styles.screen}>
+        {onBackToHome && (
+          <Pressable onPress={onBackToHome} style={styles.backLink}>
+            <Text style={styles.backLinkText}>← Início</Text>
+          </Pressable>
+        )}
         <Text style={styles.eyebrow}>REVISÃO DO ORÇAMENTO</Text>
         <Text style={styles.pageTitle}>{clientName}</Text>
         <Text style={styles.subtitle}>
@@ -382,6 +575,108 @@ export function QuoteDraftScreen() {
     );
   }
 
+  if (step === 'capture') {
+    return (
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={styles.flex}
+      >
+        <ScrollView
+          contentContainerStyle={styles.screen}
+          keyboardShouldPersistTaps="handled"
+        >
+          {onBackToHome && (
+            <Pressable onPress={onBackToHome} style={styles.backLink}>
+              <Text style={styles.backLinkText}>← Início</Text>
+            </Pressable>
+          )}
+          <Text style={styles.eyebrow}>ETAPA 1 DE 2</Text>
+          <Text style={styles.pageTitle}>Grave e confira</Text>
+          <Text style={styles.subtitle}>
+            Fale os detalhes do orçamento e revise a transcrição antes de
+            preencher os dados.
+          </Text>
+          <VoiceCaptureCard
+            onProcess={processRecording}
+            onRecordingChange={(next) => {
+              setRecording(next);
+              setTranscript(null);
+              if (next) {
+                setVoiceMutationId(randomUUID());
+              } else {
+                setVoiceStatus('idle');
+              }
+            }}
+            processing={voiceStatus === 'processing'}
+            recording={recording}
+          />
+          {recording && (
+            <Text
+              style={
+                voiceStatus === 'failed'
+                  ? styles.persistenceError
+                  : styles.recordingStatus
+              }
+            >
+              {voiceStatus === 'processing'
+                ? 'Enviando e transcrevendo o áudio…'
+                : voiceStatus === 'ready'
+                  ? 'Transcrição recebida. Confira o texto abaixo.'
+                  : voiceStatus === 'failed'
+                    ? 'O processamento falhou. Você pode tentar novamente.'
+                    : 'Áudio capturado. Toque em Processar áudio para gerar a transcrição.'}
+            </Text>
+          )}
+          {recording && transcript && voiceStatus === 'ready' && (
+            <View style={styles.transcriptCard}>
+              <Text style={styles.transcriptEyebrow}>TRANSCRIÇÃO</Text>
+              <Text style={styles.transcriptTitle}>
+                Confira o que entendemos
+              </Text>
+              <Text selectable style={styles.transcriptText}>
+                {transcript}
+              </Text>
+              <Text style={styles.transcriptHint}>
+                Se o texto estiver correto, avance para revisar os dados do
+                orçamento.
+              </Text>
+              <Pressable
+                onPress={() => setStep('details')}
+                style={styles.primaryButton}
+              >
+                <Text style={styles.primaryButtonText}>
+                  Continuar para os dados
+                </Text>
+              </Pressable>
+            </View>
+          )}
+          <Pressable
+            disabled={voiceStatus === 'processing'}
+            onPress={openManualDetails}
+            style={styles.secondaryButton}
+          >
+            <Text style={styles.secondaryButtonText}>
+              Preencher manualmente
+            </Text>
+          </Pressable>
+          <Text
+            style={
+              persistenceStatus === 'error'
+                ? styles.persistenceError
+                : styles.persistenceStatus
+            }
+          >
+            {persistenceStatus === 'saved'
+              ? 'Rascunho salvo neste aparelho'
+              : persistenceStatus === 'error'
+                ? 'Não foi possível salvar o rascunho local'
+                : 'Salvando rascunho…'}
+          </Text>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    );
+  }
+
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -391,23 +686,33 @@ export function QuoteDraftScreen() {
         contentContainerStyle={styles.screen}
         keyboardShouldPersistTaps="handled"
       >
-        <Text style={styles.eyebrow}>NOVO ORÇAMENTO</Text>
-        <Text style={styles.pageTitle}>Monte o rascunho</Text>
+        {onBackToHome && (
+          <Pressable onPress={onBackToHome} style={styles.backLink}>
+            <Text style={styles.backLinkText}>← Início</Text>
+          </Pressable>
+        )}
+        <Text style={styles.eyebrow}>ETAPA 2 DE 2</Text>
+        <Text style={styles.pageTitle}>Confira os dados</Text>
         <Text style={styles.subtitle}>
-          Fale uma vez ou preencha manualmente.
+          Revise e complete as informações antes de salvar o orçamento.
         </Text>
-        <VoiceCaptureCard
-          onProcess={processRecording}
-          onRecordingChange={(next) => {
-            setRecording(next);
-            if (next) {
-              setVoiceMutationId(randomUUID());
-            } else {
-              setVoiceStatus('idle');
-            }
-          }}
-          processing={voiceStatus === 'processing'}
-        />
+        <Pressable onPress={returnToCapture} style={styles.backLink}>
+          <Text style={styles.backLinkText}>← Voltar para áudio</Text>
+        </Pressable>
+        {transcript && (
+          <View style={styles.transcriptSummary}>
+            <Text style={styles.transcriptEyebrow}>TRANSCRIÇÃO CONFERIDA</Text>
+            <Text numberOfLines={5} style={styles.transcriptText}>
+              {transcript}
+            </Text>
+            <Pressable
+              onPress={resetVoiceCapture}
+              style={styles.secondaryButton}
+            >
+              <Text style={styles.secondaryButtonText}>Gravar outro áudio</Text>
+            </Pressable>
+          </View>
+        )}
         <Text
           style={
             persistenceStatus === 'error'
@@ -421,17 +726,91 @@ export function QuoteDraftScreen() {
               ? 'Não foi possível salvar o rascunho local'
               : 'Salvando rascunho…'}
         </Text>
-        {recording && (
-          <Text style={styles.recordingStatus}>
-            {voiceStatus === 'processing'
-              ? 'Enviando e interpretando o áudio…'
-              : voiceStatus === 'ready'
-                ? 'Interpretação recebida. Revise os campos antes de salvar.'
-                : voiceStatus === 'failed'
-                  ? 'O processamento falhou. Você pode tentar novamente.'
-                  : 'Áudio capturado. Toque em Processar áudio para preencher o rascunho.'}
+        <Section title="Ajuste por voz">
+          <Text style={styles.commandHint}>
+            Depois de conferir os dados, diga uma alteração específica, como
+            “altere o primeiro serviço para 3 unidades”.
           </Text>
-        )}
+          <VoiceCaptureCard
+            mode="edit"
+            onProcess={processEditRecording}
+            onRecordingChange={(next) => {
+              setEditRecording(next);
+              setEditResult(null);
+              if (next) {
+                setEditMutationId(randomUUID());
+              } else {
+                setEditStatus('idle');
+              }
+            }}
+            processing={editStatus === 'processing'}
+            recording={editRecording}
+          />
+          {editRecording && (
+            <Text
+              style={
+                editStatus === 'failed'
+                  ? styles.persistenceError
+                  : styles.recordingStatus
+              }
+            >
+              {editStatus === 'processing'
+                ? 'Enviando o comando…'
+                : editStatus === 'ready'
+                  ? 'Comando recebido. Confira a sugestão abaixo.'
+                  : editStatus === 'failed'
+                    ? 'O processamento falhou. Você pode tentar novamente.'
+                    : 'Áudio capturado. Toque em Processar áudio.'}
+            </Text>
+          )}
+          {editResult && editStatus === 'ready' && (
+            <View style={styles.editPreviewCard}>
+              <Text style={styles.transcriptEyebrow}>COMANDO IDENTIFICADO</Text>
+              <Text selectable style={styles.transcriptText}>
+                {editResult.transcript}
+              </Text>
+              <Text style={styles.editPreviewText}>
+                {describeEditCommand(editResult, services, materials)}
+              </Text>
+              {editResult.command.ambiguities.length > 0 && (
+                <Text style={styles.persistenceError}>
+                  {editResult.command.ambiguities.join(' ')}
+                </Text>
+              )}
+              <Pressable
+                disabled={
+                  editResult.command.intent !== 'update_line' ||
+                  editResult.command.section === null ||
+                  editResult.command.index === null ||
+                  editResult.command.ambiguities.length > 0
+                }
+                onPress={applyEditCommand}
+                style={[
+                  styles.primaryButton,
+                  (editResult.command.intent !== 'update_line' ||
+                    editResult.command.section === null ||
+                    editResult.command.index === null ||
+                    editResult.command.ambiguities.length > 0) &&
+                    styles.disabledButton,
+                ]}
+              >
+                <Text style={styles.primaryButtonText}>Aplicar alteração</Text>
+              </Pressable>
+            </View>
+          )}
+          {lastEditUndo && (
+            <View style={styles.undoCard}>
+              <Text style={styles.undoText}>
+                A última alteração foi aplicada ao rascunho.
+              </Text>
+              <Pressable onPress={undoLastEdit} style={styles.secondaryButton}>
+                <Text style={styles.secondaryButtonText}>
+                  Desfazer última alteração
+                </Text>
+              </Pressable>
+            </View>
+          )}
+        </Section>
         <Section title="Cliente">
           <Field label="Nome">
             <TextInput
@@ -458,14 +837,20 @@ export function QuoteDraftScreen() {
           kind="service"
           limit={5}
           lines={services}
-          onChange={setServices}
+          onChange={(next) => {
+            setServices(next);
+            setLastEditUndo(null);
+          }}
           title="Serviços"
         />
         <LineSection
           kind="material"
           limit={10}
           lines={materials}
-          onChange={setMaterials}
+          onChange={(next) => {
+            setMaterials(next);
+            setLastEditUndo(null);
+          }}
           title="Materiais"
         />
         <Section title="Condições">
@@ -676,6 +1061,15 @@ function toDomainLine(line: EditableQuoteLine) {
   };
 }
 
+function toEditContextLine(line: EditableQuoteLine) {
+  return {
+    description: line.description.trim(),
+    quantity: line.quantity,
+    unit: line.unit.trim(),
+    unitPriceInCents: parseBrlInput(line.unitPrice),
+  };
+}
+
 function toEditableLine(line: VoiceInterpretation['services'][number]) {
   return {
     description: line.description,
@@ -690,6 +1084,36 @@ function paymentPlanLabel(plan: PaymentPlan, count: string): string {
   if (plan === 'integral') return 'Pagamento integral';
   if (plan === 'partial') return 'Pagamentos parciais';
   return `${count} parcelas`;
+}
+
+function describeEditCommand(
+  result: VoiceQuoteEditInterpretation,
+  services: readonly EditableQuoteLine[],
+  materials: readonly EditableQuoteLine[],
+): string {
+  const { command } = result;
+  if (
+    command.intent !== 'update_line' ||
+    command.section === null ||
+    command.index === null
+  ) {
+    return 'Não identificamos uma alteração única para aplicar.';
+  }
+
+  const lines = command.section === 'services' ? services : materials;
+  const current = lines[command.index];
+  const label = command.section === 'services' ? 'Serviço' : 'Material';
+  const change =
+    command.changes.quantity !== null
+      ? `quantidade de ${current?.quantity || '—'} para ${command.changes.quantity}`
+      : command.changes.description !== null
+        ? `descrição para “${command.changes.description}”`
+        : command.changes.unit !== null
+          ? `unidade para “${command.changes.unit}”`
+          : command.changes.unitPriceInCents !== null
+            ? `preço para ${formatBrl(command.changes.unitPriceInCents)}`
+            : 'sem alteração identificada';
+  return `${label} ${command.index + 1}: ${change}.`;
 }
 
 function normalizePhone(value: string): string | null {
@@ -708,7 +1132,20 @@ const styles = StyleSheet.create({
     padding: 14,
   },
   addButtonText: { color: '#147553', fontSize: 15, fontWeight: '700' },
+  backLink: { alignSelf: 'flex-start', paddingVertical: 2 },
+  backLinkText: { color: '#147553', fontSize: 14, fontWeight: '800' },
   divider: { backgroundColor: '#CAD9D0', height: 1, marginVertical: 6 },
+  commandHint: { color: '#5A7064', fontSize: 14, lineHeight: 21 },
+  disabledButton: { opacity: 0.45 },
+  editPreviewCard: {
+    backgroundColor: '#F4F7F2',
+    borderColor: '#CBD8D0',
+    borderRadius: 16,
+    borderWidth: 1,
+    gap: 10,
+    padding: 15,
+  },
+  editPreviewText: { color: '#19372A', fontSize: 16, fontWeight: '700' },
   emphasized: { color: '#102A20', fontSize: 20, fontWeight: '800' },
   eyebrow: {
     color: '#16875D',
@@ -810,6 +1247,38 @@ const styles = StyleSheet.create({
   segmentText: { color: '#526A5E', fontSize: 12, fontWeight: '700' },
   segmentTextActive: { color: '#FFFFFF' },
   subtitle: { color: '#5A7064', fontSize: 16, lineHeight: 23 },
+  transcriptCard: {
+    backgroundColor: '#FFFFFF',
+    borderColor: '#CBD8D0',
+    borderRadius: 20,
+    borderWidth: 1,
+    gap: 10,
+    padding: 18,
+  },
+  transcriptEyebrow: {
+    color: '#16875D',
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 1.3,
+  },
+  transcriptHint: { color: '#5A7064', fontSize: 13, lineHeight: 19 },
+  transcriptSummary: {
+    backgroundColor: '#E4F0E9',
+    borderRadius: 16,
+    gap: 9,
+    padding: 15,
+  },
+  transcriptText: { color: '#19372A', fontSize: 16, lineHeight: 24 },
+  transcriptTitle: { color: '#19372A', fontSize: 19, fontWeight: '800' },
+  undoCard: {
+    backgroundColor: '#FFF8E8',
+    borderColor: '#E4C982',
+    borderRadius: 16,
+    borderWidth: 1,
+    gap: 10,
+    padding: 14,
+  },
+  undoText: { color: '#6A5420', fontSize: 14, lineHeight: 20 },
   summary: {
     alignItems: 'center',
     backgroundColor: '#102A20',

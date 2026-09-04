@@ -1,5 +1,9 @@
 import { createHash, randomUUID } from 'node:crypto';
-import type { CreateQuoteDraft, QuoteDraft } from '@cotali/contracts';
+import type {
+  CreateQuoteDraft,
+  QuoteDraft,
+  QuoteSummary,
+} from '@cotali/contracts';
 import { calculateQuoteTotals } from '@cotali/domain';
 
 export type CreateQuoteErrorCode =
@@ -24,6 +28,7 @@ export type PersistDraftInput = Readonly<{
 
 export interface QuoteRepository {
   createDraft(input: PersistDraftInput): Promise<QuoteDraft>;
+  listRecent(authSubject: string, limit: number): Promise<QuoteSummary[]>;
 }
 
 export class MemoryQuoteRepository implements QuoteRepository {
@@ -31,6 +36,7 @@ export class MemoryQuoteRepository implements QuoteRepository {
     string,
     Readonly<{ fingerprint: string; quote: QuoteDraft }>
   >();
+  readonly #quotes = new Map<string, QuoteSummary>();
 
   async createDraft(input: PersistDraftInput): Promise<QuoteDraft> {
     const key = `${input.authSubject}:${input.input.mutationId}`;
@@ -45,7 +51,22 @@ export class MemoryQuoteRepository implements QuoteRepository {
       fingerprint: input.fingerprint,
       quote: input.quote,
     });
+    this.#quotes.set(
+      `${input.authSubject}:${input.quote.id}`,
+      summarizeQuote(input.quote),
+    );
     return input.quote;
+  }
+
+  async listRecent(
+    authSubject: string,
+    limit: number,
+  ): Promise<QuoteSummary[]> {
+    return [...this.#quotes.entries()]
+      .filter(([key]) => key.startsWith(`${authSubject}:`))
+      .map(([, quote]) => quote)
+      .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
+      .slice(0, limit);
   }
 }
 
@@ -83,6 +104,25 @@ export class QuoteService {
       quote,
     });
   }
+
+  async listRecent(authSubject: string, limit = 20): Promise<QuoteSummary[]> {
+    const safeLimit = Number.isInteger(limit)
+      ? Math.min(Math.max(limit, 1), 50)
+      : 20;
+    return await this.repository.listRecent(authSubject, safeLimit);
+  }
+}
+
+function summarizeQuote(quote: QuoteDraft): QuoteSummary {
+  return {
+    client: quote.client,
+    createdAt: quote.createdAt,
+    id: quote.id,
+    paymentStatus: 'pending',
+    revisionNumber: quote.revisionNumber,
+    status: quote.status,
+    totalInCents: quote.totals.totalInCents,
+  };
 }
 
 export function assertSameMutation(previous: string, current: string): void {

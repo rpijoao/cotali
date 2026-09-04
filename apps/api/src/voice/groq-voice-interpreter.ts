@@ -1,4 +1,9 @@
-export { GroqVoiceInterpreter, VoiceInterpreterError } from '@cotali/voice';
+export {
+  GroqVoiceInterpreter,
+  VoiceInterpreterError,
+  type VoiceCommandInterpreter,
+  type VoiceCommandRequest,
+} from '@cotali/voice';
 export type {
   VoiceInterpretationRequest,
   VoiceInterpreter,

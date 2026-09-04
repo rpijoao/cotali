@@ -93,6 +93,56 @@ describe('POST /v1/quotes', () => {
     });
   });
 
+  it('lists recent quotes for the authenticated account', async () => {
+    app = await buildApp({
+      authenticator: new StaticAuthenticator(),
+      logger: false,
+      quoteService: new QuoteService(),
+    });
+
+    const created = await app.inject({
+      method: 'POST',
+      payload: input,
+      url: '/v1/quotes',
+    });
+    const response = await app.inject({
+      method: 'GET',
+      url: '/v1/quotes',
+    });
+
+    expect(created.statusCode).toBe(201);
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual([
+      {
+        client: input.client,
+        createdAt: expect.any(String),
+        id: created.json().id,
+        paymentStatus: 'pending',
+        revisionNumber: 1,
+        status: 'draft',
+        totalInCents: 15500,
+      },
+    ]);
+  });
+
+  it('rejects an unauthenticated quote list request', async () => {
+    app = await buildApp({
+      authenticator: new DevelopmentAuthenticator(),
+      logger: false,
+      quoteService: new QuoteService(),
+    });
+
+    const response = await app.inject({
+      method: 'GET',
+      url: '/v1/quotes',
+    });
+
+    expect(response.statusCode).toBe(401);
+    expect(response.json()).toMatchObject({
+      error: { code: 'AUTHENTICATION_REQUIRED' },
+    });
+  });
+
   it('rejects incoherent payment conditions', async () => {
     app = await buildApp({
       authenticator: new StaticAuthenticator(),

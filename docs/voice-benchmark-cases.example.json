@@ -1,0 +1,19 @@
+[
+  {
+    "id": "caso-tomadas-refletores",
+    "audio": "substitua-pelo-arquivo.wav",
+    "durationSeconds": 18,
+    "expectedTranscript": "Cliente Maria do Jesus, trocar duas tomadas, instalar três luminárias, usar dois refletores e cem watts.",
+    "expectedFields": {
+      "client": { "name": "Maria do Jesus" },
+      "services": [
+        { "description": "trocar duas tomadas", "quantity": "2" },
+        { "description": "instalar três luminárias", "quantity": "3" }
+      ],
+      "materials": [
+        { "description": "refletores", "quantity": "2" },
+        { "description": "watts", "quantity": "100" }
+      ]
+    }
+  }
+]
