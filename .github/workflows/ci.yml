@@ -74,7 +74,7 @@ jobs:
         run: pnpm --filter @cotali/api exec cross-env RUN_DATABASE_INTEGRATION=true vitest run src/quotes/prisma-quote-repository.integration.test.ts
 
       - name: Run tests without cache
-        run: pnpm turbo run test --force
+        run: pnpm turbo run test --force --only
 
       - name: Build all applications
         run: pnpm turbo run build --force
