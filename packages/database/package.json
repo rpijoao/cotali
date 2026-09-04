@@ -11,7 +11,7 @@
   },
   "scripts": {
     "build": "prisma generate && tsc -p tsconfig.build.json",
-    "check": "cross-env DATABASE_URL=postgresql://cotali:cotali@localhost:5432/cotali DATABASE_URL_UNPOOLED=postgresql://cotali:cotali@localhost:5432/cotali prisma validate && tsc --noEmit",
+    "check": "cross-env DATABASE_URL=postgresql://cotali:cotali@localhost:5432/cotali DATABASE_URL_UNPOOLED=postgresql://cotali:cotali@localhost:5432/cotali prisma generate && prisma validate && tsc --noEmit",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:migrate:deploy": "prisma migrate deploy",
