@@ -6,7 +6,14 @@ import {
   useAudioRecorderState,
 } from 'expo-audio';
 import { useEffect, useRef, useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  Alert,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { formatDuration } from './voice-duration';
 import {
   activeMeterBars,
@@ -15,10 +22,11 @@ import {
 } from './voice-metering';
 
 const MAX_RECORDING_DURATION_MS = 120_000;
-const METERED_RECORDING_PRESET = {
+const RECORDING_PRESET = {
   ...RecordingPresets.HIGH_QUALITY,
-  isMeteringEnabled: true,
+  ...(Platform.OS === 'android' ? {} : { isMeteringEnabled: true }),
 };
+const METER_PULSE_PATTERN = [1, 2, 4, 5, 3, 2, 4, 1];
 
 export type CapturedRecording = Readonly<{
   durationMs: number;
@@ -34,11 +42,25 @@ export function VoiceCaptureCard({
   onRecordingChange?: (recording: CapturedRecording | null) => void;
   processing?: boolean;
 }>) {
-  const recorder = useAudioRecorder(METERED_RECORDING_PRESET);
+  const recorder = useAudioRecorder(RECORDING_PRESET);
   const recorderState = useAudioRecorderState(recorder, 250);
   const [recording, setRecording] = useState<CapturedRecording | null>(null);
   const [busy, setBusy] = useState(false);
+  const [meterPulse, setMeterPulse] = useState(0);
   const stoppingRef = useRef(false);
+
+  useEffect(() => {
+    if (!recorderState.isRecording) {
+      setMeterPulse(0);
+      return;
+    }
+
+    const interval = setInterval(() => {
+      setMeterPulse((current) => (current + 1) % METER_PULSE_PATTERN.length);
+    }, 250);
+
+    return () => clearInterval(interval);
+  }, [recorderState.isRecording]);
 
   useEffect(() => {
     if (
@@ -49,6 +71,8 @@ export function VoiceCaptureCard({
       void finishRecording();
     }
   }, [recorderState.durationMillis, recorderState.isRecording]);
+
+  const pulseBars = METER_PULSE_PATTERN[meterPulse] ?? 1;
 
   async function startRecording() {
     setBusy(true);
@@ -150,18 +174,13 @@ export function VoiceCaptureCard({
               {formatDuration(recorderState.durationMillis)} / 02:00
             </Text>
           </View>
-          <View
-            accessibilityLabel={
-              normalizeMetering(recorderState.metering) >= 0.2
-                ? 'Microfone captando áudio'
-                : 'Nenhum sinal de áudio detectado'
-            }
-            style={styles.meterRow}
-          >
+          <View style={styles.meterRow} accessibilityLabel="Microfone ativo">
             <Text style={styles.meterLabel}>
-              {normalizeMetering(recorderState.metering) >= 0.2
-                ? 'Microfone captando'
-                : 'Fale perto do microfone'}
+              {Platform.OS === 'android'
+                ? 'Microfone ativo'
+                : normalizeMetering(recorderState.metering) >= 0.2
+                  ? 'Microfone captando'
+                  : 'Fale perto do microfone'}
             </Text>
             <View style={styles.meter}>
               {Array.from({ length: METER_BAR_COUNT }, (_, index) => (
@@ -169,8 +188,15 @@ export function VoiceCaptureCard({
                   key={index}
                   style={[
                     styles.meterBar,
-                    { height: 8 + index * 4 },
-                    index < activeMeterBars(recorderState.metering) &&
+                    {
+                      height:
+                        Platform.OS === 'android'
+                          ? 8 + Math.min(index, pulseBars - 1) * 4
+                          : 8 + index * 4,
+                    },
+                    (Platform.OS === 'android'
+                      ? index < pulseBars
+                      : index < activeMeterBars(recorderState.metering)) &&
                       styles.meterBarActive,
                   ]}
                 />
