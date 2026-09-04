@@ -24,4 +24,3 @@ Antes de propor ou implementar uma mudança voltada ao usuário, leia:
 O framework orienta decisões de produto; não substitui os contratos de domínio, as regras financeiras, os requisitos de segurança, privacidade e acessibilidade, nem a arquitetura definida nos ADRs. Nenhum ganho de conversão justifica violar esses limites.
 
 Quando uma decisão não tiver evidência suficiente, registre-a como hipótese e defina como será validada. Não copie layouts, textos ou princípios externos sem adaptar ao ICP e ao contexto do Cotali.
-

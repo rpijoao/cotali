@@ -72,15 +72,15 @@ O motivo para voltar deve ser o trabalho que o profissional consegue concluir me
 
 ## Aplicação por superfície
 
-| Superfície | Decisão orientada por valor | Sinal de sucesso |
-| --- | --- | --- |
-| Landing page | Problema específico, mecanismo visível, prova honesta e CTA claro | início da jornada de interesse ou do primeiro orçamento |
-| Entrada no produto | Chegar rapidamente à primeira descrição de serviço | tempo até primeiro orçamento revisável |
-| Captura por voz | Uma ação evidente, estado sempre visível e recuperação em falhas | gravação concluída e processamento sem perda |
-| Revisão | Destacar apenas pendências que exigem decisão | orçamento validado sem nova gravação |
-| PDF e WhatsApp | Tornar o resultado compartilhável e explicar o estado real do envio | proposta gerada e compartilhamento iniciado |
-| Histórico | Preservar o trabalho que reduz esforço futuro | segundo orçamento e reutilização de clientes |
-| Pagamento e recibo | Mostrar valor, saldo e natureza comercial sem ambiguidade | pagamento confirmado e recibo correto |
+| Superfície         | Decisão orientada por valor                                         | Sinal de sucesso                                        |
+| ------------------ | ------------------------------------------------------------------- | ------------------------------------------------------- |
+| Landing page       | Problema específico, mecanismo visível, prova honesta e CTA claro   | início da jornada de interesse ou do primeiro orçamento |
+| Entrada no produto | Chegar rapidamente à primeira descrição de serviço                  | tempo até primeiro orçamento revisável                  |
+| Captura por voz    | Uma ação evidente, estado sempre visível e recuperação em falhas    | gravação concluída e processamento sem perda            |
+| Revisão            | Destacar apenas pendências que exigem decisão                       | orçamento validado sem nova gravação                    |
+| PDF e WhatsApp     | Tornar o resultado compartilhável e explicar o estado real do envio | proposta gerada e compartilhamento iniciado             |
+| Histórico          | Preservar o trabalho que reduz esforço futuro                       | segundo orçamento e reutilização de clientes            |
+| Pagamento e recibo | Mostrar valor, saldo e natureza comercial sem ambiguidade           | pagamento confirmado e recibo correto                   |
 
 ## Guardrails de confiança
 
@@ -106,4 +106,3 @@ Uma decisão pode ser esteticamente boa e ainda assim falhar se não for compree
 ## Fonte e atribuição
 
 Referência principal: [Revenue-Centric Design](https://github.com/heliocosta-dev/revenue-centric-design), de heliocosta-dev, baseado no trabalho de Richard (`@richardrx`). Consultado em 2026-09-04. O conteúdo original possui termos de uso próprios; este documento mantém a atribuição e resume apenas a aplicação necessária ao Cotali.
-
