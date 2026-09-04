@@ -64,6 +64,8 @@ No fluxo de criação, o app Android já permite preencher e revisar manualmente
 
 `GET /v1/quotes` retorna até 20 orçamentos recentes da conta autenticada para
 alimentar a tela inicial, sem expor o áudio ou outros dados de processamento.
+`GET /v1/quotes/:id` retorna a revisão atual completa de um orçamento da mesma
+conta para a tela de detalhes.
 
 Em desenvolvimento, use `Authorization: Bearer dev:local-user`. Esse modo é recusado quando `NODE_ENV=production`. Em produção, a API exige `OIDC_ISSUER`, `OIDC_AUDIENCE` e `OIDC_JWKS_URL` para validar JWTs assinados pelo provedor escolhido.
 

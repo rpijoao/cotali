@@ -11,11 +11,13 @@ let interpretQuoteVoice: (input: {
   uri: string;
 }) => Promise<unknown>;
 let listQuoteSummaries: () => Promise<unknown>;
+let getQuoteDetails: (quoteId: string) => Promise<unknown>;
 
 beforeAll(async () => {
   process.env.EXPO_PUBLIC_API_URL = 'http://localhost:3333';
   process.env.EXPO_PUBLIC_DEV_AUTH_TOKEN = 'dev:local-user';
-  ({ interpretQuoteVoice, listQuoteSummaries } = await import('./quote-api'));
+  ({ getQuoteDetails, interpretQuoteVoice, listQuoteSummaries } =
+    await import('./quote-api'));
 });
 
 afterEach(() => fetchMock.mockReset());
@@ -98,6 +100,66 @@ describe('listQuoteSummaries', () => {
 
     await expect(listQuoteSummaries()).rejects.toThrow(
       'A API retornou uma lista de orçamentos inválida.',
+    );
+  });
+});
+
+describe('getQuoteDetails', () => {
+  it('loads a saved quote by id', async () => {
+    const quote = {
+      client: { name: 'Ana Maria', phone: null },
+      conditions: {
+        executionDeadline: null,
+        installmentCount: null,
+        notes: null,
+        paymentMethod: 'Pix',
+        paymentPlanType: 'integral',
+        validUntil: null,
+      },
+      createdAt: '2026-09-04T12:00:00.000Z',
+      discountInCents: 0,
+      id: '9c6d3b5e-8f2a-4b18-9c3d-7a6e5f4b2c1d',
+      materials: [],
+      paymentStatus: 'pending',
+      revisionNumber: 1,
+      services: [
+        {
+          description: 'Instalação',
+          quantity: '1',
+          unit: 'un',
+          unitPriceInCents: 15000,
+        },
+      ],
+      source: 'manual',
+      status: 'draft',
+      totals: {
+        discountInCents: 0,
+        materialsInCents: 0,
+        servicesInCents: 15000,
+        subtotalInCents: 15000,
+        totalInCents: 15000,
+      },
+    };
+    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => quote });
+
+    await expect(getQuoteDetails(quote.id)).resolves.toEqual(quote);
+    expect(fetchMock).toHaveBeenCalledWith(
+      `http://localhost:3333/v1/quotes/${quote.id}`,
+      {
+        headers: { authorization: 'Bearer dev:local-user' },
+        method: 'GET',
+      },
+    );
+  });
+
+  it('rejects malformed detail data', async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ id: 'not-a-detail' }),
+    });
+
+    await expect(getQuoteDetails('not-a-uuid')).rejects.toThrow(
+      'A API retornou um orçamento inválido.',
     );
   });
 });

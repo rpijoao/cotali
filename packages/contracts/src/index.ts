@@ -128,6 +128,56 @@ export const QuoteSummaryListSchema = Type.Array(QuoteSummarySchema, {
   maxItems: 50,
 });
 
+export const QuoteDetailsSchema = Type.Object(
+  {
+    id: Type.String({ format: 'uuid' }),
+    client: Type.Object(
+      {
+        name: Type.String({ minLength: 1, maxLength: 120 }),
+        phone: Type.Union([
+          Type.String({ minLength: 11, maxLength: 20 }),
+          Type.Null(),
+        ]),
+      },
+      { additionalProperties: false },
+    ),
+    services: Type.Array(QuoteLineInputSchema, { minItems: 1, maxItems: 5 }),
+    materials: Type.Array(QuoteLineInputSchema, { maxItems: 10 }),
+    conditions: Type.Object(
+      {
+        paymentMethod: Type.Union([
+          Type.String({ minLength: 1, maxLength: 80 }),
+          Type.Null(),
+        ]),
+        paymentPlanType: PaymentPlanTypeSchema,
+        installmentCount: Type.Union([
+          Type.Integer({ minimum: 2, maximum: 24 }),
+          Type.Null(),
+        ]),
+        executionDeadline: Type.Union([
+          Type.String({ minLength: 1, maxLength: 120 }),
+          Type.Null(),
+        ]),
+        validUntil: Type.Union([Type.String({ format: 'date' }), Type.Null()]),
+        notes: Type.Union([Type.String({ maxLength: 1000 }), Type.Null()]),
+      },
+      { additionalProperties: false },
+    ),
+    discountInCents: Type.Integer({ minimum: 0 }),
+    source: Type.Union([
+      Type.Literal('manual'),
+      Type.Literal('interpretation'),
+      Type.Literal('mixed'),
+    ]),
+    revisionNumber: Type.Integer({ minimum: 1 }),
+    status: QuoteStatusSchema,
+    paymentStatus: PaymentStatusSchema,
+    totals: QuoteTotalsSchema,
+    createdAt: Type.String({ format: 'date-time' }),
+  },
+  { additionalProperties: false },
+);
+
 const NullableString = Type.Union([Type.String(), Type.Null()]);
 
 export const VoiceLineProposalSchema = Type.Object(
@@ -314,6 +364,7 @@ export type QuoteLineInput = Static<typeof QuoteLineInputSchema>;
 export type QuoteStatus = Static<typeof QuoteStatusSchema>;
 export type PaymentStatus = Static<typeof PaymentStatusSchema>;
 export type QuoteSummary = Static<typeof QuoteSummarySchema>;
+export type QuoteDetails = Static<typeof QuoteDetailsSchema>;
 export type VoiceInterpretation = Static<typeof VoiceInterpretationSchema>;
 export type VoiceInterpretationJob = Static<
   typeof VoiceInterpretationJobSchema

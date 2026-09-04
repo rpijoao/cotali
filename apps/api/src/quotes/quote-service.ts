@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 import type {
   CreateQuoteDraft,
+  QuoteDetails,
   QuoteDraft,
   QuoteSummary,
 } from '@cotali/contracts';
@@ -28,6 +29,7 @@ export type PersistDraftInput = Readonly<{
 
 export interface QuoteRepository {
   createDraft(input: PersistDraftInput): Promise<QuoteDraft>;
+  getById(authSubject: string, quoteId: string): Promise<QuoteDetails | null>;
   listRecent(authSubject: string, limit: number): Promise<QuoteSummary[]>;
 }
 
@@ -37,6 +39,7 @@ export class MemoryQuoteRepository implements QuoteRepository {
     Readonly<{ fingerprint: string; quote: QuoteDraft }>
   >();
   readonly #quotes = new Map<string, QuoteSummary>();
+  readonly #details = new Map<string, QuoteDetails>();
 
   async createDraft(input: PersistDraftInput): Promise<QuoteDraft> {
     const key = `${input.authSubject}:${input.input.mutationId}`;
@@ -55,7 +58,18 @@ export class MemoryQuoteRepository implements QuoteRepository {
       `${input.authSubject}:${input.quote.id}`,
       summarizeQuote(input.quote),
     );
+    this.#details.set(
+      `${input.authSubject}:${input.quote.id}`,
+      toQuoteDetails(input.quote),
+    );
     return input.quote;
+  }
+
+  async getById(
+    authSubject: string,
+    quoteId: string,
+  ): Promise<QuoteDetails | null> {
+    return this.#details.get(`${authSubject}:${quoteId}`) ?? null;
   }
 
   async listRecent(
@@ -111,6 +125,13 @@ export class QuoteService {
       : 20;
     return await this.repository.listRecent(authSubject, safeLimit);
   }
+
+  async getById(
+    authSubject: string,
+    quoteId: string,
+  ): Promise<QuoteDetails | null> {
+    return await this.repository.getById(authSubject, quoteId);
+  }
 }
 
 function summarizeQuote(quote: QuoteDraft): QuoteSummary {
@@ -122,6 +143,23 @@ function summarizeQuote(quote: QuoteDraft): QuoteSummary {
     revisionNumber: quote.revisionNumber,
     status: quote.status,
     totalInCents: quote.totals.totalInCents,
+  };
+}
+
+function toQuoteDetails(quote: QuoteDraft): QuoteDetails {
+  return {
+    client: quote.client,
+    conditions: quote.conditions,
+    createdAt: quote.createdAt,
+    discountInCents: quote.discountInCents,
+    id: quote.id,
+    materials: quote.materials,
+    paymentStatus: 'pending',
+    revisionNumber: quote.revisionNumber,
+    services: quote.services,
+    source: quote.source,
+    status: quote.status,
+    totals: quote.totals,
   };
 }
 

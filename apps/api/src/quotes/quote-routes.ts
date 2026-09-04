@@ -1,10 +1,12 @@
 import {
   ApiErrorSchema,
   CreateQuoteDraftSchema,
+  QuoteDetailsSchema,
   QuoteSummaryListSchema,
   QuoteDraftSchema,
   type CreateQuoteDraft,
 } from '@cotali/contracts';
+import { Type } from '@sinclair/typebox';
 import { QuoteDomainError } from '@cotali/domain';
 import type { FastifyInstance } from 'fastify';
 import {
@@ -35,6 +37,45 @@ export async function registerQuoteRoutes(
           request.headers.authorization,
         );
         return await quoteService.listRecent(identity.subject);
+      } catch (error) {
+        if (error instanceof AuthenticationError) {
+          return await reply.status(401).send({
+            error: { code: 'AUTHENTICATION_REQUIRED', message: error.message },
+          });
+        }
+        throw error;
+      }
+    },
+  );
+
+  app.get<{ Params: { id: string } }>(
+    '/v1/quotes/:id',
+    {
+      schema: {
+        params: Type.Object({ id: Type.String({ format: 'uuid' }) }),
+        response: {
+          200: QuoteDetailsSchema,
+          401: ApiErrorSchema,
+          404: ApiErrorSchema,
+        },
+        tags: ['quotes'],
+      },
+    },
+    async (request, reply) => {
+      try {
+        const identity = await authenticator.authenticate(
+          request.headers.authorization,
+        );
+        const quote = await quoteService.getById(
+          identity.subject,
+          request.params.id,
+        );
+        if (!quote) {
+          return await reply.status(404).send({
+            error: { code: 'QUOTE_NOT_FOUND', message: 'Quote not found.' },
+          });
+        }
+        return quote;
       } catch (error) {
         if (error instanceof AuthenticationError) {
           return await reply.status(401).send({

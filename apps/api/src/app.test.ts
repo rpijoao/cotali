@@ -143,6 +143,64 @@ describe('POST /v1/quotes', () => {
     });
   });
 
+  it('opens a saved quote by id without exposing the mutation key', async () => {
+    app = await buildApp({
+      authenticator: new StaticAuthenticator(),
+      logger: false,
+      quoteService: new QuoteService(),
+    });
+
+    const created = await app.inject({
+      method: 'POST',
+      payload: input,
+      url: '/v1/quotes',
+    });
+    const quote = await app.inject({
+      method: 'GET',
+      url: `/v1/quotes/${created.json().id}`,
+    });
+
+    expect(quote.statusCode).toBe(200);
+    expect(quote.json()).toEqual({
+      client: input.client,
+      conditions: { ...input.conditions, notes: '' },
+      createdAt: expect.any(String),
+      discountInCents: input.discountInCents,
+      id: created.json().id,
+      materials: input.materials,
+      paymentStatus: 'pending',
+      revisionNumber: 1,
+      services: input.services,
+      source: input.source,
+      status: 'draft',
+      totals: {
+        discountInCents: 500,
+        materialsInCents: 6000,
+        servicesInCents: 10000,
+        subtotalInCents: 16000,
+        totalInCents: 15500,
+      },
+    });
+  });
+
+  it('returns not found for a quote outside the account', async () => {
+    app = await buildApp({
+      authenticator: new StaticAuthenticator(),
+      logger: false,
+      quoteService: new QuoteService(),
+    });
+
+    const response = await app.inject({
+      method: 'GET',
+      url: '/v1/quotes/9c6d3b5e-8f2a-4b18-9c3d-7a6e5f4b2c1d',
+    });
+
+    expect(response.statusCode).toBe(404);
+    expect(response.json()).toMatchObject({
+      error: { code: 'QUOTE_NOT_FOUND' },
+    });
+  });
+
   it('rejects incoherent payment conditions', async () => {
     app = await buildApp({
       authenticator: new StaticAuthenticator(),

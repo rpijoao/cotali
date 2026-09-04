@@ -1,5 +1,6 @@
 import type {
   CreateQuoteDraft,
+  QuoteDetails,
   QuoteDraft,
   QuoteSummary,
   VoiceQuoteEditContext,
@@ -58,6 +59,28 @@ export async function listQuoteSummaries(): Promise<QuoteSummary[]> {
   }
   if (!isQuoteSummaryList(body)) {
     throw new Error('A API retornou uma lista de orçamentos inválida.');
+  }
+  return body;
+}
+
+export async function getQuoteDetails(quoteId: string): Promise<QuoteDetails> {
+  if (!developmentToken) {
+    throw new Error('A sessão autenticada ainda não foi configurada.');
+  }
+
+  const response = await fetch(
+    `${apiUrl}/v1/quotes/${encodeURIComponent(quoteId)}`,
+    { headers: { authorization: `Bearer ${developmentToken}` }, method: 'GET' },
+  );
+  const body: unknown = await response.json();
+
+  if (!response.ok) {
+    throw new Error(
+      readApiMessage(body) ?? 'Não foi possível carregar o orçamento.',
+    );
+  }
+  if (!isQuoteDetails(body)) {
+    throw new Error('A API retornou um orçamento inválido.');
   }
   return body;
 }
@@ -202,6 +225,30 @@ function isQuoteSummaryList(value: unknown): value is QuoteSummary[] {
         'totalInCents' in item &&
         typeof item.totalInCents === 'number',
     )
+  );
+}
+
+function isQuoteDetails(value: unknown): value is QuoteDetails {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'id' in value &&
+    typeof value.id === 'string' &&
+    'client' in value &&
+    typeof value.client === 'object' &&
+    value.client !== null &&
+    'name' in value.client &&
+    typeof value.client.name === 'string' &&
+    'services' in value &&
+    Array.isArray(value.services) &&
+    'materials' in value &&
+    Array.isArray(value.materials) &&
+    'conditions' in value &&
+    typeof value.conditions === 'object' &&
+    value.conditions !== null &&
+    'totals' in value &&
+    typeof value.totals === 'object' &&
+    value.totals !== null
   );
 }
 

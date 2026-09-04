@@ -75,5 +75,18 @@ run('PrismaQuoteRepository', () => {
         where: { account: { authSubject: subject }, mutationId },
       }),
     ).toBe(1);
+
+    const details = await new PrismaQuoteRepository(prisma).getById(
+      subject,
+      first.id,
+    );
+    expect(details).toMatchObject({
+      client: input.client,
+      id: first.id,
+      paymentStatus: 'pending',
+      services: input.services,
+      source: 'manual',
+      status: 'draft',
+    });
   }, 20_000);
 });

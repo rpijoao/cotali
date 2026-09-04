@@ -1,5 +1,6 @@
 import type {
   CreateQuoteDraft,
+  QuoteDetails,
   QuoteDraft,
   QuoteLineInput,
   QuoteSummary,
@@ -62,6 +63,60 @@ export class PrismaQuoteRepository implements QuoteRepository {
       status: mapQuoteStatus(quote.status),
       totalInCents: toSafeInteger(quote.totalCents),
     }));
+  }
+
+  async getById(
+    authSubject: string,
+    quoteId: string,
+  ): Promise<QuoteDetails | null> {
+    const quote = await this.prisma.quote.findFirst({
+      include: {
+        client: true,
+        currentRevision: {
+          include: {
+            materials: { orderBy: { position: 'asc' } },
+            services: { orderBy: { position: 'asc' } },
+          },
+        },
+      },
+      where: {
+        account: { authSubject },
+        deletedAt: null,
+        id: quoteId,
+      },
+    });
+    const revision = quote?.currentRevision;
+    if (!quote || !revision) return null;
+
+    return {
+      client: { name: quote.client.name, phone: quote.client.phone },
+      conditions: {
+        executionDeadline: revision.executionDeadline,
+        installmentCount: revision.installmentCount,
+        notes: revision.notes,
+        paymentMethod: revision.paymentMethod,
+        paymentPlanType: mapStoredPaymentPlan(revision.paymentPlanType),
+        validUntil: revision.validUntil
+          ? revision.validUntil.toISOString().slice(0, 10)
+          : null,
+      },
+      createdAt: quote.createdAt.toISOString(),
+      discountInCents: toSafeInteger(revision.discountCents),
+      id: quote.id,
+      materials: revision.materials.map(toQuoteLine),
+      paymentStatus: mapPaymentStatus(quote.paymentStatus),
+      revisionNumber: revision.revisionNumber,
+      services: revision.services.map(toQuoteLine),
+      source: mapStoredSource(revision.source),
+      status: mapQuoteStatus(quote.status),
+      totals: {
+        discountInCents: toSafeInteger(revision.discountCents),
+        materialsInCents: toSafeInteger(revision.materialsSubtotal),
+        servicesInCents: toSafeInteger(revision.servicesSubtotal),
+        subtotalInCents: toSafeInteger(revision.subtotalCents),
+        totalInCents: toSafeInteger(revision.totalCents),
+      },
+    };
   }
 
   private async persist(input: PersistDraftInput): Promise<QuoteDraft> {
@@ -207,6 +262,41 @@ function mapPaymentStatus(status: string): QuoteSummary['paymentStatus'] {
     PENDING: 'pending',
   } as const;
   return values[status as keyof typeof values] ?? 'pending';
+}
+
+function mapStoredPaymentPlan(
+  paymentPlanType: string,
+): QuoteDetails['conditions']['paymentPlanType'] {
+  const values = {
+    INSTALLMENTS: 'installments',
+    INTEGRAL: 'integral',
+    PARTIAL: 'partial',
+  } as const;
+  return values[paymentPlanType as keyof typeof values] ?? 'integral';
+}
+
+function mapStoredSource(source: string): QuoteDetails['source'] {
+  const values = {
+    INTERPRETATION: 'interpretation',
+    MANUAL: 'manual',
+    MIXED: 'mixed',
+  } as const;
+  return values[source as keyof typeof values] ?? 'manual';
+}
+
+function toQuoteLine(line: {
+  description: string;
+  quantity: { toString(): string };
+  unit: string | null;
+  unitPriceCents: bigint | null;
+}) {
+  return {
+    description: line.description,
+    quantity: line.quantity.toString(),
+    unit: line.unit,
+    unitPriceInCents:
+      line.unitPriceCents === null ? null : toSafeInteger(line.unitPriceCents),
+  };
 }
 
 function toSafeInteger(value: bigint): number {

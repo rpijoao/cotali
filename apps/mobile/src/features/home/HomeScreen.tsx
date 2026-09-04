@@ -20,9 +20,11 @@ import { formatBrl } from '../quotes/money';
 export function HomeScreen({
   onContinueDraft,
   onCreateQuote,
+  onOpenQuote,
 }: Readonly<{
   onContinueDraft: () => void;
   onCreateQuote: () => void;
+  onOpenQuote: (quoteId: string) => void;
 }>) {
   const [quotes, setQuotes] = useState<QuoteSummary[]>([]);
   const [localDraft, setLocalDraft] = useState<LocalQuoteDraft | null>(null);
@@ -137,16 +139,23 @@ export function HomeScreen({
         )}
 
         {quotes.map((quote) => (
-          <QuoteSummaryCard key={quote.id} quote={quote} />
+          <QuoteSummaryCard
+            key={quote.id}
+            onPress={() => onOpenQuote(quote.id)}
+            quote={quote}
+          />
         ))}
       </ScrollView>
     </View>
   );
 }
 
-function QuoteSummaryCard({ quote }: Readonly<{ quote: QuoteSummary }>) {
+function QuoteSummaryCard({
+  onPress,
+  quote,
+}: Readonly<{ onPress: () => void; quote: QuoteSummary }>) {
   return (
-    <View style={styles.quoteCard}>
+    <Pressable onPress={onPress} style={styles.quoteCard}>
       <View style={styles.cardHeading}>
         <Text style={styles.quoteClient} numberOfLines={1}>
           {quote.client.name}
@@ -157,7 +166,7 @@ function QuoteSummaryCard({ quote }: Readonly<{ quote: QuoteSummary }>) {
         <Text style={styles.quoteDate}>{formatDate(quote.createdAt)}</Text>
         <Text style={styles.quoteTotal}>{formatBrl(quote.totalInCents)}</Text>
       </View>
-    </View>
+    </Pressable>
   );
 }
 
