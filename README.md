@@ -4,6 +4,10 @@ A paleta oficial do Cotali é azul `#1846e1` e branco `#ffffff`. Consulte a [ide
 
 Aplicativo mobile-first para profissionais autônomos criarem orçamentos por voz e compartilharem propostas e recibos em PDF.
 
+## Decisões de produto
+
+As decisões de produto, UX, copy, aquisição, ativação, monetização e retenção seguem o [framework de valor do Cotali](./docs/product/cotali-revenue-centric-design.md), adaptado do [Revenue-Centric Design](https://github.com/heliocosta-dev/revenue-centric-design). Mudanças de feature e fluxo devem partir do [template de briefing](./docs/product/feature-brief-template.md).
+
 ## Requisitos
 
 - Node.js 24 LTS
