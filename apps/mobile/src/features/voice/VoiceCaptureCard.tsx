@@ -2,9 +2,12 @@ import {
   RecordingPresets,
   requestRecordingPermissionsAsync,
   setAudioModeAsync,
+  useAudioStream,
   useAudioRecorder,
   useAudioRecorderState,
 } from 'expo-audio';
+import type { AudioStreamBuffer } from 'expo-audio';
+import { File, FileMode, Paths } from 'expo-file-system';
 import { useEffect, useRef, useState } from 'react';
 import {
   Alert,
@@ -20,6 +23,7 @@ import {
   METER_BAR_COUNT,
   normalizeMetering,
 } from './voice-metering';
+import { pcmBufferToDecibels } from './audio-level';
 
 const MAX_RECORDING_DURATION_MS = 120_000;
 const RECORDING_PRESET = {
@@ -27,6 +31,62 @@ const RECORDING_PRESET = {
   ...(Platform.OS === 'android' ? {} : { isMeteringEnabled: true }),
 };
 const METER_PULSE_PATTERN = [1, 2, 4, 5, 3, 2, 4, 1];
+
+function createPcmWavBytes(
+  chunks: readonly Uint8Array[],
+  sampleRate: number,
+  channels: number,
+): Uint8Array {
+  const dataLength = chunks.reduce(
+    (total, chunk) => total + chunk.byteLength,
+    0,
+  );
+  const bytes = new Uint8Array(44 + dataLength);
+  const view = new DataView(bytes.buffer);
+  const writeText = (offset: number, value: string) => {
+    for (let index = 0; index < value.length; index += 1) {
+      view.setUint8(offset + index, value.charCodeAt(index));
+    }
+  };
+
+  writeText(0, 'RIFF');
+  view.setUint32(4, 36 + dataLength, true);
+  writeText(8, 'WAVE');
+  writeText(12, 'fmt ');
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, channels, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * channels * 2, true);
+  view.setUint16(32, channels * 2, true);
+  view.setUint16(34, 16, true);
+  writeText(36, 'data');
+  view.setUint32(40, dataLength, true);
+
+  let offset = 44;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+
+  return bytes;
+}
+
+function writePcmWavFile(
+  chunks: readonly Uint8Array[],
+  sampleRate: number,
+  channels: number,
+): string {
+  const file = new File(Paths.cache, `cotali-recording-${Date.now()}.wav`);
+  file.create({ overwrite: true });
+  const handle = file.open(FileMode.WriteOnly);
+  try {
+    handle.writeBytes(createPcmWavBytes(chunks, sampleRate, channels));
+  } finally {
+    handle.close();
+  }
+  return file.uri;
+}
 
 export type CapturedRecording = Readonly<{
   durationMs: number;
@@ -47,10 +107,54 @@ export function VoiceCaptureCard({
   const [recording, setRecording] = useState<CapturedRecording | null>(null);
   const [busy, setBusy] = useState(false);
   const [meterPulse, setMeterPulse] = useState(0);
+  const [streamMetering, setStreamMetering] = useState<number | undefined>();
+  const [androidRecordingStartedAt, setAndroidRecordingStartedAt] = useState<
+    number | null
+  >(null);
+  const [androidElapsedMillis, setAndroidElapsedMillis] = useState(0);
+  const pcmChunksRef = useRef<Uint8Array[]>([]);
+  const pcmSampleRateRef = useRef(16_000);
+  const pcmChannelsRef = useRef(1);
+  const androidRecordingStartedAtRef = useRef<number | null>(null);
+  const lastMeterUpdateAtRef = useRef(0);
   const stoppingRef = useRef(false);
 
+  const { stream } = useAudioStream({
+    sampleRate: 16_000,
+    channels: 1,
+    encoding: 'int16',
+    onBuffer: (buffer: AudioStreamBuffer) => {
+      pcmSampleRateRef.current = buffer.sampleRate;
+      pcmChannelsRef.current = buffer.channels;
+      pcmChunksRef.current.push(new Uint8Array(buffer.data.slice(0)));
+      const now = Date.now();
+      if (now - lastMeterUpdateAtRef.current >= 200) {
+        lastMeterUpdateAtRef.current = now;
+        setStreamMetering(pcmBufferToDecibels(buffer.data, 'int16'));
+      }
+    },
+  });
+
   useEffect(() => {
-    if (!recorderState.isRecording) {
+    return () => stream.stop();
+  }, [stream]);
+
+  useEffect(() => {
+    if (androidRecordingStartedAt === null) {
+      setAndroidElapsedMillis(0);
+      return;
+    }
+
+    const updateElapsed = () => {
+      setAndroidElapsedMillis(Date.now() - androidRecordingStartedAt);
+    };
+    updateElapsed();
+    const interval = setInterval(updateElapsed, 250);
+    return () => clearInterval(interval);
+  }, [androidRecordingStartedAt]);
+
+  useEffect(() => {
+    if (!recorderState.isRecording && androidRecordingStartedAt === null) {
       setMeterPulse(0);
       return;
     }
@@ -60,19 +164,38 @@ export function VoiceCaptureCard({
     }, 250);
 
     return () => clearInterval(interval);
-  }, [recorderState.isRecording]);
+  }, [androidRecordingStartedAt, recorderState.isRecording]);
+
+  const isRecording =
+    androidRecordingStartedAt !== null || recorderState.isRecording;
+  const currentDurationMillis =
+    androidRecordingStartedAt !== null
+      ? androidElapsedMillis
+      : recorderState.durationMillis;
 
   useEffect(() => {
     if (
-      recorderState.isRecording &&
-      recorderState.durationMillis >= MAX_RECORDING_DURATION_MS &&
+      isRecording &&
+      currentDurationMillis >= MAX_RECORDING_DURATION_MS &&
       !stoppingRef.current
     ) {
       void finishRecording();
     }
-  }, [recorderState.durationMillis, recorderState.isRecording]);
+  }, [currentDurationMillis, isRecording]);
 
   const pulseBars = METER_PULSE_PATTERN[meterPulse] ?? 1;
+  const hasLiveAndroidMeter =
+    Platform.OS === 'android' &&
+    androidRecordingStartedAt !== null &&
+    streamMetering !== undefined;
+  const meterValue = hasLiveAndroidMeter
+    ? streamMetering
+    : recorderState.metering;
+  const visibleMeterBars = hasLiveAndroidMeter
+    ? activeMeterBars(streamMetering)
+    : Platform.OS === 'android'
+      ? pulseBars
+      : activeMeterBars(recorderState.metering);
 
   async function startRecording() {
     setBusy(true);
@@ -92,8 +215,33 @@ export function VoiceCaptureCard({
       });
       setRecording(null);
       onRecordingChange?.(null);
-      await recorder.prepareToRecordAsync();
-      recorder.record();
+      pcmChunksRef.current = [];
+      setStreamMetering(undefined);
+      androidRecordingStartedAtRef.current = null;
+      setAndroidRecordingStartedAt(null);
+      if (Platform.OS === 'android') {
+        const startedAt = Date.now();
+        androidRecordingStartedAtRef.current = startedAt;
+        setAndroidRecordingStartedAt(startedAt);
+        const startRecorderFallback = async () => {
+          if (androidRecordingStartedAtRef.current !== startedAt) return;
+          androidRecordingStartedAtRef.current = null;
+          setAndroidRecordingStartedAt(null);
+          stream.stop();
+          await recorder.prepareToRecordAsync();
+          recorder.record();
+        };
+        try {
+          void stream.start().catch(() => {
+            void startRecorderFallback();
+          });
+        } catch {
+          await startRecorderFallback();
+        }
+      } else {
+        await recorder.prepareToRecordAsync();
+        recorder.record();
+      }
     } catch {
       Alert.alert(
         'Não foi possível gravar',
@@ -109,7 +257,38 @@ export function VoiceCaptureCard({
     stoppingRef.current = true;
     setBusy(true);
     try {
-      const durationMs = recorderState.durationMillis;
+      const durationMs = currentDurationMillis;
+      if (androidRecordingStartedAt !== null) {
+        stream.stop();
+        androidRecordingStartedAtRef.current = null;
+        setAndroidRecordingStartedAt(null);
+        setStreamMetering(undefined);
+
+        if (pcmChunksRef.current.length === 0 || durationMs < 1_000) {
+          pcmChunksRef.current = [];
+          setRecording(null);
+          onRecordingChange?.(null);
+          await setAudioModeAsync({ allowsRecording: false });
+          Alert.alert(
+            'Gravação muito curta',
+            'Fale por pelo menos um segundo e tente novamente.',
+          );
+          return;
+        }
+
+        const uri = writePcmWavFile(
+          pcmChunksRef.current,
+          pcmSampleRateRef.current,
+          pcmChannelsRef.current,
+        );
+        pcmChunksRef.current = [];
+        const captured = { durationMs, uri };
+        setRecording(captured);
+        onRecordingChange?.(captured);
+        await setAudioModeAsync({ allowsRecording: false });
+        return;
+      }
+
       await recorder.stop();
       if (!recorder.uri || durationMs < 1_000) {
         setRecording(null);
@@ -139,7 +318,15 @@ export function VoiceCaptureCard({
   async function cancelRecording() {
     setBusy(true);
     try {
-      if (recorderState.isRecording) await recorder.stop();
+      if (androidRecordingStartedAt !== null) {
+        stream.stop();
+        androidRecordingStartedAtRef.current = null;
+        setAndroidRecordingStartedAt(null);
+        setStreamMetering(undefined);
+        pcmChunksRef.current = [];
+      } else if (recorderState.isRecording) {
+        await recorder.stop();
+      }
       setRecording(null);
       onRecordingChange?.(null);
       await setAudioModeAsync({ allowsRecording: false });
@@ -152,33 +339,42 @@ export function VoiceCaptureCard({
     <View style={styles.card}>
       <Text style={styles.eyebrow}>ORÇAMENTO POR VOZ</Text>
       <Text style={styles.title}>
-        {recorderState.isRecording
+        {isRecording
           ? 'Estou ouvindo…'
           : recording
             ? 'Áudio pronto para processar'
             : 'Conte o serviço uma única vez'}
       </Text>
       <Text style={styles.description}>
-        {recorderState.isRecording
+        {isRecording
           ? 'Diga cliente, serviços, materiais, preços, pagamento e prazo.'
           : recording
             ? `${formatDuration(recording.durationMs)} gravados. Você poderá revisar tudo antes de salvar.`
             : 'Você terá até 2 minutos e sempre revisará as informações extraídas.'}
       </Text>
 
-      {recorderState.isRecording && (
+      {isRecording && (
         <>
           <View style={styles.timerRow}>
             <View style={styles.recordingDot} />
             <Text style={styles.timer}>
-              {formatDuration(recorderState.durationMillis)} / 02:00
+              {formatDuration(currentDurationMillis)} / 02:00
             </Text>
           </View>
-          <View style={styles.meterRow} accessibilityLabel="Microfone ativo">
+          <View
+            style={styles.meterRow}
+            accessibilityLabel={
+              hasLiveAndroidMeter || Platform.OS !== 'android'
+                ? normalizeMetering(meterValue) >= 0.2
+                  ? 'Microfone captando áudio'
+                  : 'Nenhum sinal de áudio detectado'
+                : 'Microfone ativo'
+            }
+          >
             <Text style={styles.meterLabel}>
-              {Platform.OS === 'android'
+              {Platform.OS === 'android' && !hasLiveAndroidMeter
                 ? 'Microfone ativo'
-                : normalizeMetering(recorderState.metering) >= 0.2
+                : normalizeMetering(meterValue) >= 0.2
                   ? 'Microfone captando'
                   : 'Fale perto do microfone'}
             </Text>
@@ -190,14 +386,11 @@ export function VoiceCaptureCard({
                     styles.meterBar,
                     {
                       height:
-                        Platform.OS === 'android'
+                        Platform.OS === 'android' && !hasLiveAndroidMeter
                           ? 8 + Math.min(index, pulseBars - 1) * 4
                           : 8 + index * 4,
                     },
-                    (Platform.OS === 'android'
-                      ? index < pulseBars
-                      : index < activeMeterBars(recorderState.metering)) &&
-                      styles.meterBarActive,
+                    index < visibleMeterBars && styles.meterBarActive,
                   ]}
                 />
               ))}
@@ -207,7 +400,7 @@ export function VoiceCaptureCard({
       )}
 
       <View style={styles.actions}>
-        {recorderState.isRecording ? (
+        {isRecording ? (
           <>
             <Pressable
               disabled={busy}
@@ -236,7 +429,7 @@ export function VoiceCaptureCard({
           </Pressable>
         )}
       </View>
-      {recording && !recorderState.isRecording && (
+      {recording && !isRecording && (
         <>
           {onProcess && (
             <Pressable

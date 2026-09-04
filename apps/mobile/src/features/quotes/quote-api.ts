@@ -78,7 +78,10 @@ async function appendAudioPart(form: FormData, uri: string): Promise<void> {
     return;
   }
 
-  form.append('audio', new File(uri), 'cotali-recording.m4a');
+  const filename = uri.toLowerCase().endsWith('.wav')
+    ? 'cotali-recording.wav'
+    : 'cotali-recording.m4a';
+  form.append('audio', new File(uri), filename);
 }
 
 function audioFilename(mimeType: string): string {
