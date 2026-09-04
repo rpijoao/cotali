@@ -85,4 +85,8 @@ jobs:
           pnpm --filter @cotali/web test
 
       - name: Build all applications
-        run: pnpm turbo run build --force
+        run: |
+          pnpm --filter @cotali/api... build
+          pnpm --filter @cotali/mobile build
+          pnpm --filter @cotali/web build
+          pnpm --filter @cotali/worker build
