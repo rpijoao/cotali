@@ -8,8 +8,17 @@ import {
 import { useEffect, useRef, useState } from 'react';
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { formatDuration } from './voice-duration';
+import {
+  activeMeterBars,
+  METER_BAR_COUNT,
+  normalizeMetering,
+} from './voice-metering';
 
 const MAX_RECORDING_DURATION_MS = 120_000;
+const METERED_RECORDING_PRESET = {
+  ...RecordingPresets.HIGH_QUALITY,
+  isMeteringEnabled: true,
+};
 
 export type CapturedRecording = Readonly<{
   durationMs: number;
@@ -25,7 +34,7 @@ export function VoiceCaptureCard({
   onRecordingChange?: (recording: CapturedRecording | null) => void;
   processing?: boolean;
 }>) {
-  const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
+  const recorder = useAudioRecorder(METERED_RECORDING_PRESET);
   const recorderState = useAudioRecorderState(recorder, 250);
   const [recording, setRecording] = useState<CapturedRecording | null>(null);
   const [busy, setBusy] = useState(false);
@@ -134,12 +143,41 @@ export function VoiceCaptureCard({
       </Text>
 
       {recorderState.isRecording && (
-        <View style={styles.timerRow}>
-          <View style={styles.recordingDot} />
-          <Text style={styles.timer}>
-            {formatDuration(recorderState.durationMillis)} / 02:00
-          </Text>
-        </View>
+        <>
+          <View style={styles.timerRow}>
+            <View style={styles.recordingDot} />
+            <Text style={styles.timer}>
+              {formatDuration(recorderState.durationMillis)} / 02:00
+            </Text>
+          </View>
+          <View
+            accessibilityLabel={
+              normalizeMetering(recorderState.metering) >= 0.2
+                ? 'Microfone captando áudio'
+                : 'Nenhum sinal de áudio detectado'
+            }
+            style={styles.meterRow}
+          >
+            <Text style={styles.meterLabel}>
+              {normalizeMetering(recorderState.metering) >= 0.2
+                ? 'Microfone captando'
+                : 'Fale perto do microfone'}
+            </Text>
+            <View style={styles.meter}>
+              {Array.from({ length: METER_BAR_COUNT }, (_, index) => (
+                <View
+                  key={index}
+                  style={[
+                    styles.meterBar,
+                    { height: 8 + index * 4 },
+                    index < activeMeterBars(recorderState.metering) &&
+                      styles.meterBarActive,
+                  ]}
+                />
+              ))}
+            </View>
+          </View>
+        </>
       )}
 
       <View style={styles.actions}>
@@ -228,6 +266,24 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     height: 12,
     width: 12,
+  },
+  meter: {
+    alignItems: 'flex-end',
+    flexDirection: 'row',
+    gap: 3,
+    height: 28,
+  },
+  meterBar: {
+    backgroundColor: '#315043',
+    borderRadius: 2,
+    width: 5,
+  },
+  meterBarActive: { backgroundColor: '#72D6AA' },
+  meterLabel: { color: '#C6D5CC', fontSize: 12, fontWeight: '700' },
+  meterRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
   },
   removeText: {
     color: '#AFC6B9',
