@@ -1,57 +1,51 @@
-:root {
-  color-scheme: light;
-  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+@import "tailwindcss";
+
+@theme inline {
+  --color-cotali-blue: #1846e1;
+  --color-cotali-navy: #102c87;
+  --color-cotali-ink: #0b1220;
+  --color-cotali-white: #ffffff;
+  --color-cotali-cloud: #f5f7fb;
+  --color-cotali-mist: #e6ebf3;
+  --color-cotali-sky: #dfe8ff;
+  --color-cotali-slate: #60708d;
+  --font-cotali-body: var(--font-body);
+  --font-cotali-display: var(--font-display);
+  --breakpoint-phone: 38.75rem;
+  --breakpoint-tablet: 51.25rem;
+  --breakpoint-laptop: 65.625rem;
+  --shadow-cotali-proposal: 10px 12px 0 rgb(24 70 225 / 0.12);
+  --shadow-cotali-card: 0 18px 60px rgb(11 18 32 / 0.12);
+  --shadow-cotali-phone: 0 25px 90px rgb(5 27 110 / 0.3);
+  --tracking-cotali-display: -0.09em;
+  --tracking-cotali-tight: -0.095em;
+  --leading-cotali-display: 0.94;
 }
 
-* {
-  box-sizing: border-box;
-}
+@theme {
+  --animate-cotali-rise: cotali-rise 700ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  --animate-cotali-float: cotali-float 7s ease-in-out infinite;
 
-body {
-  background: #f4f7f2;
-  color: #102a20;
-  margin: 0;
-}
+  @keyframes cotali-rise {
+    from {
+      opacity: 0;
+      transform: translateY(14px);
+    }
 
-main {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  margin: 0 auto;
-  min-height: 100vh;
-  padding: 48px 24px;
-  width: min(100%, 960px);
-}
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
 
-h1 {
-  font-size: clamp(3rem, 9vw, 7rem);
-  letter-spacing: -0.06em;
-  line-height: 0.95;
-  margin: 20px 0;
-  max-width: 900px;
-}
+  @keyframes cotali-float {
+    0%,
+    100% {
+      transform: translateY(0) rotate(2deg);
+    }
 
-.eyebrow {
-  color: #16875d;
-  font-size: 0.875rem;
-  font-weight: 800;
-  letter-spacing: 0.18em;
-}
-
-.lead {
-  color: #476052;
-  font-size: clamp(1.125rem, 2.5vw, 1.5rem);
-  line-height: 1.5;
-  max-width: 640px;
-}
-
-.badge {
-  align-self: flex-start;
-  background: #d9eee4;
-  border-radius: 999px;
-  color: #0f6546;
-  font-size: 0.875rem;
-  font-weight: 700;
-  margin-top: 28px;
-  padding: 10px 14px;
+    50% {
+      transform: translateY(-8px) rotate(1deg);
+    }
+  }
 }
