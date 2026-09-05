@@ -16,28 +16,35 @@ import {
 } from '../quotes/quote-draft-state';
 import { loadLocalQuoteDraft } from '../quotes/quote-draft-storage';
 import { formatBrl } from '../quotes/money';
+import {
+  hasProfessionalProfileContent,
+  type LocalProfessionalProfile,
+} from '../profile/profile-state';
+import { loadProfessionalProfile } from '../profile/profile-storage';
 
 export function HomeScreen({
   onContinueDraft,
   onCreateQuote,
   onOpenQuote,
+  onOpenProfile,
 }: Readonly<{
   onContinueDraft: () => void;
   onCreateQuote: () => void;
   onOpenQuote: (quoteId: string) => void;
+  onOpenProfile: () => void;
 }>) {
   const [quotes, setQuotes] = useState<QuoteSummary[]>([]);
   const [localDraft, setLocalDraft] = useState<LocalQuoteDraft | null>(null);
+  const [profile, setProfile] = useState<LocalProfessionalProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const loadHome = useCallback(async () => {
     setError(null);
-    const [draftResult, quotesResult] = await Promise.allSettled([
-      loadLocalQuoteDraft(),
-      listQuoteSummaries(),
-    ]);
+    const [draftResult, quotesResult, profileResult] = await Promise.allSettled(
+      [loadLocalQuoteDraft(), listQuoteSummaries(), loadProfessionalProfile()],
+    );
 
     if (draftResult.status === 'fulfilled') {
       setLocalDraft(
@@ -50,6 +57,14 @@ export function HomeScreen({
       setQuotes(quotesResult.value);
     } else {
       setError('Não foi possível atualizar os orçamentos agora.');
+    }
+    if (profileResult.status === 'fulfilled') {
+      setProfile(
+        profileResult.value &&
+          hasProfessionalProfileContent(profileResult.value)
+          ? profileResult.value
+          : null,
+      );
     }
     setLoading(false);
   }, []);
@@ -76,11 +91,24 @@ export function HomeScreen({
         <View style={styles.header}>
           <View>
             <Text style={styles.brand}>cotali</Text>
-            <Text style={styles.greeting}>Bom trabalho hoje.</Text>
+            <Text style={styles.greeting}>
+              {profile
+                ? `Olá, ${firstName(profile.name)}.`
+                : 'Bom trabalho hoje.'}
+            </Text>
           </View>
-          <View style={styles.profileDot}>
-            <Text style={styles.profileInitial}>C</Text>
-          </View>
+          <Pressable
+            accessibilityLabel="Abrir perfil profissional"
+            onPress={onOpenProfile}
+            style={({ pressed }) => [
+              styles.profileDot,
+              pressed && styles.pressed,
+            ]}
+          >
+            <Text style={styles.profileInitial}>
+              {profileInitial(profile?.name)}
+            </Text>
+          </Pressable>
         </View>
 
         <View style={styles.heroCard}>
@@ -150,6 +178,14 @@ export function HomeScreen({
   );
 }
 
+function firstName(name: string): string {
+  return name.trim().split(/\s+/u)[0] ?? name;
+}
+
+function profileInitial(name: string | undefined): string {
+  return name?.trim().charAt(0).toUpperCase() || 'C';
+}
+
 function QuoteSummaryCard({
   onPress,
   quote,
@@ -212,6 +248,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     width: 44,
   },
+  pressed: { opacity: 0.72 },
   profileInitial: { color: '#1846E1', fontSize: 17, fontWeight: '800' },
   heroCard: {
     backgroundColor: '#1846E1',
