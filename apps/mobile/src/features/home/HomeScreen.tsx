@@ -20,7 +20,7 @@ import {
   hasProfessionalProfileContent,
   type LocalProfessionalProfile,
 } from '../profile/profile-state';
-import { loadProfessionalProfile } from '../profile/profile-storage';
+import { loadProfessionalProfileWithCache } from '../profile/profile-api';
 
 export function HomeScreen({
   onContinueDraft,
@@ -43,7 +43,11 @@ export function HomeScreen({
   const loadHome = useCallback(async () => {
     setError(null);
     const [draftResult, quotesResult, profileResult] = await Promise.allSettled(
-      [loadLocalQuoteDraft(), listQuoteSummaries(), loadProfessionalProfile()],
+      [
+        loadLocalQuoteDraft(),
+        listQuoteSummaries(),
+        loadProfessionalProfileWithCache(),
+      ],
     );
 
     if (draftResult.status === 'fulfilled') {
@@ -60,9 +64,9 @@ export function HomeScreen({
     }
     if (profileResult.status === 'fulfilled') {
       setProfile(
-        profileResult.value &&
-          hasProfessionalProfileContent(profileResult.value)
-          ? profileResult.value
+        profileResult.value.profile &&
+          hasProfessionalProfileContent(profileResult.value.profile)
+          ? profileResult.value.profile
           : null,
       );
     }

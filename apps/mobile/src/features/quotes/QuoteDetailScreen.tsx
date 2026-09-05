@@ -9,7 +9,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import { getQuoteDetails } from './quote-api';
+import { getQuoteDetails, shareQuoteProposal } from './quote-api';
 import { formatBrl } from './money';
 
 export function QuoteDetailScreen({
@@ -22,6 +22,8 @@ export function QuoteDetailScreen({
   const [quote, setQuote] = useState<QuoteDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [sharingPdf, setSharingPdf] = useState(false);
+  const [pdfError, setPdfError] = useState<string | null>(null);
 
   const loadQuote = useCallback(async () => {
     setLoading(true);
@@ -36,6 +38,22 @@ export function QuoteDetailScreen({
       );
     } finally {
       setLoading(false);
+    }
+  }, [quoteId]);
+
+  const handleSharePdf = useCallback(async () => {
+    setSharingPdf(true);
+    setPdfError(null);
+    try {
+      await shareQuoteProposal(quoteId);
+    } catch (cause) {
+      setPdfError(
+        cause instanceof Error
+          ? cause.message
+          : 'Não foi possível gerar o PDF do orçamento.',
+      );
+    } finally {
+      setSharingPdf(false);
     }
   }, [quoteId]);
 
@@ -94,6 +112,29 @@ export function QuoteDetailScreen({
           Criado em {formatDate(quote.createdAt)} · revisão{' '}
           {quote.revisionNumber}
         </Text>
+      </View>
+
+      <View style={styles.pdfCard}>
+        <View style={styles.pdfCopy}>
+          <Text style={styles.pdfTitle}>Proposta pronta para enviar</Text>
+          <Text style={styles.pdfDescription}>
+            Gere o PDF com os dados desta revisão e abra o compartilhamento do
+            Android.
+          </Text>
+        </View>
+        <Pressable
+          accessibilityRole="button"
+          disabled={sharingPdf}
+          onPress={() => void handleSharePdf()}
+          style={[styles.pdfButton, sharingPdf && styles.pdfButtonDisabled]}
+        >
+          {sharingPdf ? (
+            <ActivityIndicator color="#FFFFFF" />
+          ) : (
+            <Text style={styles.pdfButtonText}>Gerar e compartilhar PDF</Text>
+          )}
+        </Pressable>
+        {pdfError && <Text style={styles.pdfError}>{pdfError}</Text>}
       </View>
 
       <LineSection lines={quote.services} title="Serviços" />
@@ -236,6 +277,7 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     padding: 24,
     paddingBottom: 48,
+    paddingTop: 48,
   },
   centered: {
     alignItems: 'center',
@@ -300,6 +342,39 @@ const styles = StyleSheet.create({
     marginTop: 5,
   },
   totalMeta: { color: '#E9EEFF', fontSize: 13, marginTop: 8 },
+  pdfCard: {
+    backgroundColor: '#FFFFFF',
+    borderColor: '#C9D7FF',
+    borderRadius: 18,
+    borderWidth: 1,
+    marginTop: 14,
+    padding: 18,
+  },
+  pdfCopy: { marginBottom: 14 },
+  pdfTitle: { color: '#293D35', fontSize: 16, fontWeight: '800' },
+  pdfDescription: {
+    color: '#6F7E76',
+    fontSize: 13,
+    lineHeight: 19,
+    marginTop: 5,
+  },
+  pdfButton: {
+    alignItems: 'center',
+    backgroundColor: '#1846E1',
+    borderRadius: 12,
+    minHeight: 48,
+    justifyContent: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  pdfButtonDisabled: { opacity: 0.65 },
+  pdfButtonText: { color: '#FFFFFF', fontSize: 14, fontWeight: '800' },
+  pdfError: {
+    color: '#B33D35',
+    fontSize: 13,
+    lineHeight: 18,
+    marginTop: 10,
+  },
   card: {
     backgroundColor: '#FFFFFF',
     borderColor: '#E0E8E2',

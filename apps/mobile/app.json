@@ -19,7 +19,8 @@
         }
       ],
       "expo-asset",
-      "expo-sqlite"
+      "expo-sqlite",
+      "expo-sharing"
     ],
     "runtimeVersion": {
       "policy": "appVersion"

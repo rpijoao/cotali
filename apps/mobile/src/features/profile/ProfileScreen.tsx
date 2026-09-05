@@ -15,9 +15,11 @@ import {
   type LocalProfessionalProfile,
 } from './profile-state';
 import {
-  loadProfessionalProfile,
-  saveProfessionalProfile,
-} from './profile-storage';
+  loadProfessionalProfileWithCache,
+  toLocalProfessionalProfile,
+  updateProfessionalProfile,
+} from './profile-api';
+import { saveProfessionalProfile } from './profile-storage';
 
 export function ProfileScreen({ onBack }: Readonly<{ onBack: () => void }>) {
   const [profile, setProfile] = useState<LocalProfessionalProfile>(
@@ -28,15 +30,20 @@ export function ProfileScreen({ onBack }: Readonly<{ onBack: () => void }>) {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    void loadProfessionalProfile()
-      .then((savedProfile) => {
-        if (savedProfile) setProfile(savedProfile);
-      })
+    void loadProfile()
       .catch(() => {
         setError('Não foi possível carregar o perfil neste aparelho.');
       })
       .finally(() => setLoading(false));
   }, []);
+
+  async function loadProfile() {
+    const result = await loadProfessionalProfileWithCache();
+    setProfile(result.profile ?? EMPTY_PROFESSIONAL_PROFILE);
+    if (result.source === 'cache') {
+      setError('Sem conexão: mostrando o perfil salvo neste aparelho.');
+    }
+  }
 
   function update(field: keyof LocalProfessionalProfile, value: string) {
     setProfile((current) => ({ ...current, [field]: value }));
@@ -52,7 +59,7 @@ export function ProfileScreen({ onBack }: Readonly<{ onBack: () => void }>) {
     setSaving(true);
     setError(null);
     try {
-      await saveProfessionalProfile({
+      const savedProfile = await updateProfessionalProfile({
         ...profile,
         name: profile.name.trim(),
         businessName: profile.businessName.trim(),
@@ -60,9 +67,12 @@ export function ProfileScreen({ onBack }: Readonly<{ onBack: () => void }>) {
         document: profile.document.trim(),
         address: profile.address.trim(),
       });
+      await saveProfessionalProfile(toLocalProfessionalProfile(savedProfile));
       onBack();
     } catch {
-      setError('Não foi possível salvar o perfil. Tente novamente.');
+      setError(
+        'Não foi possível sincronizar o perfil. Confira a conexão e tente novamente.',
+      );
     } finally {
       setSaving(false);
     }
@@ -179,7 +189,7 @@ function Field({
 
 const styles = StyleSheet.create({
   root: { backgroundColor: '#F4F7F3', flex: 1 },
-  content: { padding: 24, paddingBottom: 48 },
+  content: { padding: 24, paddingBottom: 48, paddingTop: 48 },
   centered: {
     alignItems: 'center',
     backgroundColor: '#F4F7F3',

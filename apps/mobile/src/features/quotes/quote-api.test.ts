@@ -1,7 +1,19 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
 vi.mock('react-native', () => ({ Platform: { OS: 'web' } }));
-vi.mock('expo-file-system', () => ({ File: class File {} }));
+const sharingMock = {
+  isAvailableAsync: vi.fn(),
+  shareAsync: vi.fn(),
+};
+
+vi.mock('expo-file-system', () => ({
+  File: class File {
+    readonly uri = 'file:///documents/cotali-proposal.pdf';
+    write = vi.fn();
+  },
+  Paths: { document: 'file:///documents' },
+}));
+vi.mock('expo-sharing', () => sharingMock);
 
 const fetchMock = vi.fn();
 vi.stubGlobal('fetch', fetchMock);
@@ -12,12 +24,19 @@ let interpretQuoteVoice: (input: {
 }) => Promise<unknown>;
 let listQuoteSummaries: () => Promise<unknown>;
 let getQuoteDetails: (quoteId: string) => Promise<unknown>;
+let downloadQuoteProposal: (quoteId: string) => Promise<unknown>;
+let shareQuoteProposal: (quoteId: string) => Promise<void>;
 
 beforeAll(async () => {
   process.env.EXPO_PUBLIC_API_URL = 'http://localhost:3333';
   process.env.EXPO_PUBLIC_DEV_AUTH_TOKEN = 'dev:local-user';
-  ({ getQuoteDetails, interpretQuoteVoice, listQuoteSummaries } =
-    await import('./quote-api'));
+  ({
+    downloadQuoteProposal,
+    getQuoteDetails,
+    interpretQuoteVoice,
+    listQuoteSummaries,
+    shareQuoteProposal,
+  } = await import('./quote-api'));
 });
 
 afterEach(() => fetchMock.mockReset());
@@ -160,6 +179,61 @@ describe('getQuoteDetails', () => {
 
     await expect(getQuoteDetails('not-a-uuid')).rejects.toThrow(
       'A API retornou um orçamento inválido.',
+    );
+  });
+});
+
+describe('quote proposal PDF', () => {
+  const quoteId = '9c6d3b5e-8f2a-4b18-9c3d-7a6e5f4b2c1d';
+
+  it('downloads the authenticated PDF into the app documents directory', async () => {
+    const arrayBuffer = new TextEncoder().encode('%PDF-1.4').buffer;
+    fetchMock.mockResolvedValueOnce({
+      arrayBuffer: async () => arrayBuffer,
+      ok: true,
+    });
+
+    await expect(downloadQuoteProposal(quoteId)).resolves.toMatchObject({
+      uri: 'file:///documents/cotali-proposal.pdf',
+    });
+    expect(fetchMock).toHaveBeenCalledWith(
+      `http://localhost:3333/v1/quotes/${quoteId}/proposal.pdf`,
+      {
+        headers: { authorization: 'Bearer dev:local-user' },
+        method: 'GET',
+      },
+    );
+  });
+
+  it('downloads and opens the native share sheet', async () => {
+    const arrayBuffer = new TextEncoder().encode('%PDF-1.4').buffer;
+    fetchMock.mockResolvedValueOnce({
+      arrayBuffer: async () => arrayBuffer,
+      ok: true,
+    });
+    sharingMock.isAvailableAsync.mockResolvedValueOnce(true);
+    sharingMock.shareAsync.mockResolvedValueOnce(undefined);
+
+    await expect(shareQuoteProposal(quoteId)).resolves.toBeUndefined();
+    expect(sharingMock.shareAsync).toHaveBeenCalledWith(
+      'file:///documents/cotali-proposal.pdf',
+      {
+        dialogTitle: 'Compartilhar orçamento',
+        mimeType: 'application/pdf',
+      },
+    );
+  });
+
+  it('surfaces API errors instead of saving an invalid response', async () => {
+    fetchMock.mockResolvedValueOnce({
+      json: async () => ({
+        error: { code: 'QUOTE_NOT_FOUND', message: 'Quote not found.' },
+      }),
+      ok: false,
+    });
+
+    await expect(downloadQuoteProposal(quoteId)).rejects.toThrow(
+      'Quote not found.',
     );
   });
 });

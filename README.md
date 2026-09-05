@@ -70,6 +70,17 @@ No fluxo de criação, o app Android já permite preencher e revisar manualmente
 alimentar a tela inicial, sem expor o áudio ou outros dados de processamento.
 `GET /v1/quotes/:id` retorna a revisão atual completa de um orçamento da mesma
 conta para a tela de detalhes.
+`GET /v1/quotes/:id/proposal.pdf` gera a proposta em PDF no backend a partir
+da revisão corrente validada, incluindo o perfil profissional sincronizado
+quando disponível. O endpoint responde `404` se a cotação não pertencer à conta
+autenticada.
+Na tela de detalhes do Android, **Gerar e compartilhar PDF** baixa esse arquivo
+para o diretório de documentos do app e abre a folha nativa de compartilhamento.
+
+`GET /v1/profile` e `PATCH /v1/profile` mantêm os dados profissionais da conta
+(nome profissional, nome comercial, telefone, documento e endereço). O Android
+mantém uma cópia local para leitura quando estiver sem conexão, mas a versão
+sincronizada na API/PostgreSQL é a fonte oficial para documentos futuros.
 
 Em desenvolvimento, use `Authorization: Bearer dev:local-user`. Esse modo é recusado quando `NODE_ENV=production`. Em produção, a API exige `OIDC_ISSUER`, `OIDC_AUDIENCE` e `OIDC_JWKS_URL` para validar JWTs assinados pelo provedor escolhido.
 

@@ -102,6 +102,60 @@ export const PaymentStatusSchema = Type.Union([
   Type.Literal('paid'),
 ]);
 
+const ProfileOptionalText = Type.Union([
+  Type.String({ minLength: 1, maxLength: 240 }),
+  Type.Null(),
+]);
+
+export const ProfessionalProfileSchema = Type.Object(
+  {
+    address: ProfileOptionalText,
+    businessName: Type.Union([
+      Type.String({ minLength: 1, maxLength: 120 }),
+      Type.Null(),
+    ]),
+    document: Type.Union([
+      Type.String({ minLength: 1, maxLength: 20 }),
+      Type.Null(),
+    ]),
+    name: Type.String({ maxLength: 120 }),
+    phone: Type.Union([
+      Type.String({
+        minLength: 11,
+        maxLength: 20,
+        pattern: '^\\+[1-9]\\d{9,19}$',
+      }),
+      Type.Null(),
+    ]),
+    updatedAt: Type.Union([Type.String({ format: 'date-time' }), Type.Null()]),
+  },
+  { additionalProperties: false },
+);
+
+export const UpdateProfessionalProfileSchema = Type.Object(
+  {
+    address: ProfileOptionalText,
+    businessName: Type.Union([
+      Type.String({ minLength: 1, maxLength: 120 }),
+      Type.Null(),
+    ]),
+    document: Type.Union([
+      Type.String({ minLength: 1, maxLength: 20 }),
+      Type.Null(),
+    ]),
+    name: Type.String({ minLength: 1, maxLength: 120 }),
+    phone: Type.Union([
+      Type.String({
+        minLength: 11,
+        maxLength: 20,
+        pattern: '^\\+[1-9]\\d{9,19}$',
+      }),
+      Type.Null(),
+    ]),
+  },
+  { additionalProperties: false },
+);
+
 export const QuoteSummarySchema = Type.Object(
   {
     id: Type.String({ format: 'uuid' }),
@@ -359,6 +413,10 @@ export const ApiErrorSchema = Type.Object({
 
 export type CreateQuoteDraft = Static<typeof CreateQuoteDraftSchema>;
 export type PaymentPlanType = Static<typeof PaymentPlanTypeSchema>;
+export type ProfessionalProfile = Static<typeof ProfessionalProfileSchema>;
+export type UpdateProfessionalProfile = Static<
+  typeof UpdateProfessionalProfileSchema
+>;
 export type QuoteDraft = Static<typeof QuoteDraftSchema>;
 export type QuoteLineInput = Static<typeof QuoteLineInputSchema>;
 export type QuoteStatus = Static<typeof QuoteStatusSchema>;

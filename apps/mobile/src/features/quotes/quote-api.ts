@@ -8,7 +8,8 @@ import type {
   VoiceInterpretation,
   VoiceInterpretationJob,
 } from '@cotali/contracts';
-import { File } from 'expo-file-system';
+import { File, Paths } from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
 import { Platform } from 'react-native';
 
 const apiUrl = process.env.EXPO_PUBLIC_API_URL ?? 'http://10.0.2.2:3333';
@@ -83,6 +84,54 @@ export async function getQuoteDetails(quoteId: string): Promise<QuoteDetails> {
     throw new Error('A API retornou um orçamento inválido.');
   }
   return body;
+}
+
+export async function downloadQuoteProposal(quoteId: string): Promise<File> {
+  if (!developmentToken) {
+    throw new Error('A sessão autenticada ainda não foi configurada.');
+  }
+
+  const response = await fetch(
+    `${apiUrl}/v1/quotes/${encodeURIComponent(quoteId)}/proposal.pdf`,
+    {
+      headers: { authorization: `Bearer ${developmentToken}` },
+      method: 'GET',
+    },
+  );
+
+  if (!response.ok) {
+    let body: unknown = null;
+    try {
+      body = await response.json();
+    } catch {
+      // The API may return a non-JSON transport error for a binary endpoint.
+    }
+    throw new Error(
+      readApiMessage(body) ?? 'Não foi possível gerar o PDF do orçamento.',
+    );
+  }
+
+  const bytes = new Uint8Array(await response.arrayBuffer());
+  if (bytes.length === 0) {
+    throw new Error('A API retornou um PDF vazio.');
+  }
+
+  const file = new File(Paths.document, `cotali-orcamento-${quoteId}.pdf`);
+  file.write(bytes);
+  return file;
+}
+
+export async function shareQuoteProposal(quoteId: string): Promise<void> {
+  const file = await downloadQuoteProposal(quoteId);
+  if (!(await Sharing.isAvailableAsync())) {
+    throw new Error(
+      'O compartilhamento não está disponível neste dispositivo.',
+    );
+  }
+  await Sharing.shareAsync(file.uri, {
+    dialogTitle: 'Compartilhar orçamento',
+    mimeType: 'application/pdf',
+  });
 }
 
 export async function interpretQuoteVoice(input: {
