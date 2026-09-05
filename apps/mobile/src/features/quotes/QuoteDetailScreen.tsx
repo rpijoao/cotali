@@ -9,7 +9,11 @@ import {
   Text,
   View,
 } from 'react-native';
-import { getQuoteDetails, shareQuoteProposal } from './quote-api';
+import {
+  getQuoteDetails,
+  shareQuoteProposal,
+  shareQuoteProposalToWhatsApp,
+} from './quote-api';
 import { formatBrl } from './money';
 
 export function QuoteDetailScreen({
@@ -24,6 +28,8 @@ export function QuoteDetailScreen({
   const [error, setError] = useState<string | null>(null);
   const [sharingPdf, setSharingPdf] = useState(false);
   const [pdfError, setPdfError] = useState<string | null>(null);
+  const [sharingWhatsApp, setSharingWhatsApp] = useState(false);
+  const [whatsAppError, setWhatsAppError] = useState<string | null>(null);
 
   const loadQuote = useCallback(async () => {
     setLoading(true);
@@ -40,6 +46,27 @@ export function QuoteDetailScreen({
       setLoading(false);
     }
   }, [quoteId]);
+
+  const handleShareToWhatsApp = useCallback(async () => {
+    if (!quote) return;
+    setSharingWhatsApp(true);
+    setWhatsAppError(null);
+    try {
+      await shareQuoteProposalToWhatsApp({
+        clientName: quote.client.name,
+        clientPhone: quote.client.phone,
+        quoteId,
+      });
+    } catch (cause) {
+      setWhatsAppError(
+        cause instanceof Error
+          ? cause.message
+          : 'Não foi possível preparar o envio pelo WhatsApp.',
+      );
+    } finally {
+      setSharingWhatsApp(false);
+    }
+  }, [quote, quoteId]);
 
   const handleSharePdf = useCallback(async () => {
     setSharingPdf(true);
@@ -114,24 +141,54 @@ export function QuoteDetailScreen({
         </Text>
       </View>
 
+      <View style={styles.whatsAppCard}>
+        <View style={styles.pdfCopy}>
+          <Text style={styles.pdfTitle}>Enviar pelo WhatsApp</Text>
+          <Text style={styles.pdfDescription}>
+            Gere o PDF e prepare uma mensagem para o WhatsApp com os dados deste
+            cliente.
+          </Text>
+        </View>
+        <Pressable
+          accessibilityRole="button"
+          disabled={sharingWhatsApp}
+          onPress={() => void handleShareToWhatsApp()}
+          style={[
+            styles.pdfButton,
+            sharingWhatsApp && styles.pdfButtonDisabled,
+          ]}
+        >
+          {sharingWhatsApp ? (
+            <ActivityIndicator color="#FFFFFF" />
+          ) : (
+            <Text style={styles.pdfButtonText}>Enviar pelo WhatsApp</Text>
+          )}
+        </Pressable>
+        {whatsAppError && <Text style={styles.pdfError}>{whatsAppError}</Text>}
+      </View>
+
       <View style={styles.pdfCard}>
         <View style={styles.pdfCopy}>
-          <Text style={styles.pdfTitle}>Proposta pronta para enviar</Text>
+          <Text style={styles.pdfTitle}>Exportar PDF</Text>
           <Text style={styles.pdfDescription}>
-            Gere o PDF com os dados desta revisão e abra o compartilhamento do
-            Android.
+            Escolha outro aplicativo para compartilhar ou salve o arquivo no
+            aparelho.
           </Text>
         </View>
         <Pressable
           accessibilityRole="button"
           disabled={sharingPdf}
           onPress={() => void handleSharePdf()}
-          style={[styles.pdfButton, sharingPdf && styles.pdfButtonDisabled]}
+          style={[
+            styles.pdfButton,
+            styles.exportButton,
+            sharingPdf && styles.pdfButtonDisabled,
+          ]}
         >
           {sharingPdf ? (
-            <ActivityIndicator color="#FFFFFF" />
+            <ActivityIndicator color="#1846E1" />
           ) : (
-            <Text style={styles.pdfButtonText}>Gerar e compartilhar PDF</Text>
+            <Text style={styles.exportButtonText}>Exportar PDF</Text>
           )}
         </Pressable>
         {pdfError && <Text style={styles.pdfError}>{pdfError}</Text>}
@@ -350,6 +407,14 @@ const styles = StyleSheet.create({
     marginTop: 14,
     padding: 18,
   },
+  whatsAppCard: {
+    backgroundColor: '#EAF0FF',
+    borderColor: '#1846E1',
+    borderRadius: 18,
+    borderWidth: 1,
+    marginTop: 14,
+    padding: 18,
+  },
   pdfCopy: { marginBottom: 14 },
   pdfTitle: { color: '#293D35', fontSize: 16, fontWeight: '800' },
   pdfDescription: {
@@ -367,8 +432,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 12,
   },
+  exportButton: {
+    backgroundColor: '#FFFFFF',
+    borderColor: '#1846E1',
+    borderWidth: 1,
+  },
   pdfButtonDisabled: { opacity: 0.65 },
   pdfButtonText: { color: '#FFFFFF', fontSize: 14, fontWeight: '800' },
+  exportButtonText: { color: '#1846E1', fontSize: 14, fontWeight: '800' },
   pdfError: {
     color: '#B33D35',
     fontSize: 13,

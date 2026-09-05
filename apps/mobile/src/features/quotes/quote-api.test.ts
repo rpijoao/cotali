@@ -1,6 +1,21 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
-vi.mock('react-native', () => ({ Platform: { OS: 'web' } }));
+const { nativeShareMock, platformMock, turboModuleRegistryMock } = vi.hoisted(
+  () => ({
+    nativeShareMock: {
+      Social: { WHATSAPP: 'whatsapp' },
+      open: vi.fn(),
+      shareSingle: vi.fn(),
+    },
+    platformMock: { OS: 'web' as string },
+    turboModuleRegistryMock: { get: vi.fn((): object | null => ({})) },
+  }),
+);
+
+vi.mock('react-native', () => ({
+  Platform: platformMock,
+  TurboModuleRegistry: turboModuleRegistryMock,
+}));
 const sharingMock = {
   isAvailableAsync: vi.fn(),
   shareAsync: vi.fn(),
@@ -14,6 +29,7 @@ vi.mock('expo-file-system', () => ({
   Paths: { document: 'file:///documents' },
 }));
 vi.mock('expo-sharing', () => sharingMock);
+vi.mock('react-native-share', () => ({ default: nativeShareMock }));
 
 const fetchMock = vi.fn();
 vi.stubGlobal('fetch', fetchMock);
@@ -26,6 +42,11 @@ let listQuoteSummaries: () => Promise<unknown>;
 let getQuoteDetails: (quoteId: string) => Promise<unknown>;
 let downloadQuoteProposal: (quoteId: string) => Promise<unknown>;
 let shareQuoteProposal: (quoteId: string) => Promise<void>;
+let shareQuoteProposalToWhatsApp: (input: {
+  clientName: string;
+  clientPhone: string | null;
+  quoteId: string;
+}) => Promise<void>;
 
 beforeAll(async () => {
   process.env.EXPO_PUBLIC_API_URL = 'http://localhost:3333';
@@ -36,10 +57,18 @@ beforeAll(async () => {
     interpretQuoteVoice,
     listQuoteSummaries,
     shareQuoteProposal,
+    shareQuoteProposalToWhatsApp,
   } = await import('./quote-api'));
 });
 
-afterEach(() => fetchMock.mockReset());
+afterEach(() => {
+  fetchMock.mockReset();
+  nativeShareMock.open.mockReset();
+  nativeShareMock.shareSingle.mockReset();
+  sharingMock.isAvailableAsync.mockReset();
+  sharingMock.shareAsync.mockReset();
+  platformMock.OS = 'web';
+});
 
 describe('interpretQuoteVoice on web', () => {
   it('converts the browser recording blob into a multipart file', async () => {
@@ -235,5 +264,92 @@ describe('quote proposal PDF', () => {
     await expect(downloadQuoteProposal(quoteId)).rejects.toThrow(
       'Quote not found.',
     );
+  });
+
+  it('requires a valid client WhatsApp before downloading the PDF', async () => {
+    await expect(
+      shareQuoteProposalToWhatsApp({
+        clientName: 'Ana Maria',
+        clientPhone: null,
+        quoteId,
+      }),
+    ).rejects.toThrow(
+      'Informe um WhatsApp válido para o cliente antes de enviar direto.',
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('explains that Expo Go needs a development build for WhatsApp sharing', async () => {
+    platformMock.OS = 'android';
+    turboModuleRegistryMock.get.mockReturnValueOnce(null);
+
+    await expect(
+      shareQuoteProposalToWhatsApp({
+        clientName: 'Ana Maria',
+        clientPhone: '11999999999',
+        quoteId,
+      }),
+    ).rejects.toThrow(
+      'O envio direto pelo WhatsApp exige um development build do Cotali.',
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('targets WhatsApp with a normalized phone and PDF on Android', async () => {
+    platformMock.OS = 'android';
+    const arrayBuffer = new TextEncoder().encode('%PDF-1.4').buffer;
+    fetchMock.mockResolvedValueOnce({
+      arrayBuffer: async () => arrayBuffer,
+      ok: true,
+    });
+    nativeShareMock.shareSingle.mockResolvedValueOnce({
+      message: 'ok',
+      success: true,
+    });
+
+    await expect(
+      shareQuoteProposalToWhatsApp({
+        clientName: 'Ana Maria',
+        clientPhone: '+55 (11) 99999-9999',
+        quoteId,
+      }),
+    ).resolves.toBeUndefined();
+    expect(nativeShareMock.shareSingle).toHaveBeenCalledWith({
+      filename: `cotali-orcamento-${quoteId}.pdf`,
+      message: 'Olá, Ana Maria! Segue sua proposta comercial do Cotali em PDF.',
+      social: 'whatsapp',
+      title: 'Proposta Cotali',
+      type: 'application/pdf',
+      url: 'file:///documents/cotali-proposal.pdf',
+      whatsAppNumber: '5511999999999',
+    });
+  });
+
+  it('keeps the PDF attachment in the native share sheet on iOS', async () => {
+    platformMock.OS = 'ios';
+    const arrayBuffer = new TextEncoder().encode('%PDF-1.4').buffer;
+    fetchMock.mockResolvedValueOnce({
+      arrayBuffer: async () => arrayBuffer,
+      ok: true,
+    });
+    nativeShareMock.open.mockResolvedValueOnce({
+      message: 'ok',
+      success: true,
+    });
+
+    await expect(
+      shareQuoteProposalToWhatsApp({
+        clientName: 'Ana Maria',
+        clientPhone: '11999999999',
+        quoteId,
+      }),
+    ).resolves.toBeUndefined();
+    expect(nativeShareMock.open).toHaveBeenCalledWith({
+      message: 'Olá, Ana Maria! Segue sua proposta comercial do Cotali em PDF.',
+      title: 'Proposta Cotali',
+      type: 'application/pdf',
+      url: 'file:///documents/cotali-proposal.pdf',
+    });
+    expect(nativeShareMock.shareSingle).not.toHaveBeenCalled();
   });
 });

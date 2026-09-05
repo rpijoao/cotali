@@ -10,7 +10,8 @@ import type {
 } from '@cotali/contracts';
 import { File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
-import { Platform } from 'react-native';
+import { Platform, TurboModuleRegistry } from 'react-native';
+import type NativeShare from 'react-native-share';
 
 const apiUrl = process.env.EXPO_PUBLIC_API_URL ?? 'http://10.0.2.2:3333';
 const developmentToken =
@@ -132,6 +133,104 @@ export async function shareQuoteProposal(quoteId: string): Promise<void> {
     dialogTitle: 'Compartilhar orçamento',
     mimeType: 'application/pdf',
   });
+}
+
+export async function shareQuoteProposalToWhatsApp(input: {
+  clientName: string;
+  clientPhone: string | null;
+  quoteId: string;
+}): Promise<void> {
+  const phone = normalizeWhatsAppPhone(input.clientPhone);
+  if (!phone) {
+    throw new Error(
+      'Informe um WhatsApp válido para o cliente antes de enviar direto.',
+    );
+  }
+
+  const nativeShare =
+    Platform.OS === 'android' || Platform.OS === 'ios'
+      ? await loadNativeShare()
+      : null;
+  const file = await downloadQuoteProposal(input.quoteId);
+  const clientName = input.clientName.trim() || 'cliente';
+  const message = `Olá, ${clientName}! Segue sua proposta comercial do Cotali em PDF.`;
+
+  if (Platform.OS === 'android') {
+    if (!nativeShare) {
+      throw new Error(
+        'O envio direto pelo WhatsApp exige um development build do Cotali.',
+      );
+    }
+    await nativeShare.shareSingle({
+      filename: `cotali-orcamento-${input.quoteId}.pdf`,
+      message,
+      social: nativeShare.Social.WHATSAPP,
+      title: 'Proposta Cotali',
+      type: 'application/pdf',
+      url: file.uri,
+      // The library supports this Android option, but it is not in its public
+      // TypeScript definition yet.
+      whatsAppNumber: phone,
+    } as WhatsAppShareOptions);
+    return;
+  }
+
+  if (Platform.OS === 'ios') {
+    // iOS shareSingle treats a PDF URL as text. The native share sheet keeps
+    // the PDF as an attachment and lets the user choose WhatsApp.
+    if (!nativeShare) {
+      throw new Error(
+        'O envio direto pelo WhatsApp exige um development build do Cotali.',
+      );
+    }
+    await nativeShare.open({
+      message,
+      title: 'Proposta Cotali',
+      type: 'application/pdf',
+      url: file.uri,
+    });
+    return;
+  }
+
+  if (!(await Sharing.isAvailableAsync())) {
+    throw new Error(
+      'O compartilhamento não está disponível neste dispositivo.',
+    );
+  }
+  await Sharing.shareAsync(file.uri, {
+    dialogTitle: 'Compartilhar orçamento',
+    mimeType: 'application/pdf',
+  });
+}
+
+type WhatsAppShareOptions = Parameters<typeof NativeShare.shareSingle>[0] & {
+  whatsAppNumber: string;
+};
+
+type NativeShareModule = typeof NativeShare;
+
+async function loadNativeShare(): Promise<NativeShareModule> {
+  if (!TurboModuleRegistry.get('RNShare')) {
+    throw new Error(
+      'O envio direto pelo WhatsApp exige um development build do Cotali.',
+    );
+  }
+  try {
+    return (await import('react-native-share')).default;
+  } catch {
+    throw new Error(
+      'O envio direto pelo WhatsApp exige um development build do Cotali.',
+    );
+  }
+}
+
+function normalizeWhatsAppPhone(value: string | null): string | null {
+  if (!value) return null;
+  const digits = value.replace(/\D/g, '');
+  if (digits === '') return null;
+  const normalized = digits.length <= 11 ? `55${digits}` : digits;
+  if (normalized.length < 10 || normalized.length > 15) return null;
+  return normalized;
 }
 
 export async function interpretQuoteVoice(input: {

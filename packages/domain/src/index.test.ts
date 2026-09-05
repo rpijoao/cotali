@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  applyQuoteClientNameEdit,
   applyQuoteLineEdit,
   calculateLineTotalInCents,
   calculateQuoteTotals,
@@ -187,4 +188,21 @@ describe('voice quote line edits', () => {
       expect.objectContaining({ code }),
     );
   });
+});
+
+describe('voice quote client edits', () => {
+  it('trims and returns the proposed client name', () => {
+    expect(
+      applyQuoteClientNameEdit({ name: '  Roberto Pedro Pereira  ' }),
+    ).toBe('Roberto Pedro Pereira');
+  });
+
+  it.each(['', '   ', 'a'.repeat(161)])(
+    'rejects an invalid client name',
+    (name) => {
+      expect(() => applyQuoteClientNameEdit({ name })).toThrowError(
+        expect.objectContaining({ code: 'QUOTE_EDIT_INVALID_VALUE' }),
+      );
+    },
+  );
 });
