@@ -71,6 +71,12 @@ export const CreateQuoteDraftSchema = Type.Object(
   { additionalProperties: false },
 );
 
+// Editing a saved quote creates a new immutable revision. The payload has the
+// same shape as a new draft, including a mutation id for idempotent retries.
+export const UpdateQuoteRevisionSchema = Type.Composite([
+  CreateQuoteDraftSchema,
+]);
+
 export const QuoteTotalsSchema = Type.Object({
   discountInCents: Type.Integer({ minimum: 0 }),
   materialsInCents: Type.Integer({ minimum: 0 }),
@@ -433,6 +439,7 @@ export const ApiErrorSchema = Type.Object({
 });
 
 export type CreateQuoteDraft = Static<typeof CreateQuoteDraftSchema>;
+export type UpdateQuoteRevision = Static<typeof UpdateQuoteRevisionSchema>;
 export type PaymentPlanType = Static<typeof PaymentPlanTypeSchema>;
 export type ProfessionalProfile = Static<typeof ProfessionalProfileSchema>;
 export type UpdateProfessionalProfile = Static<

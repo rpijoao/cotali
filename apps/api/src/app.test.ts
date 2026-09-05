@@ -257,6 +257,65 @@ describe('POST /v1/quotes', () => {
     });
   });
 
+  it('saves an edit as a new current revision and is idempotent', async () => {
+    app = await buildApp({
+      authenticator: new StaticAuthenticator(),
+      logger: false,
+      quoteService: new QuoteService(),
+    });
+
+    const created = await app.inject({
+      method: 'POST',
+      payload: input,
+      url: '/v1/quotes',
+    });
+    const editInput = {
+      ...input,
+      client: { name: 'Maria Silva Atualizada', phone: null },
+      mutationId: '9c6d3b5e-8f2a-4b18-9c3d-7a6e5f4b2c1d',
+      services: [
+        {
+          description: 'Instalação de duas tomadas',
+          quantity: '3',
+          unit: 'un',
+          unitPriceInCents: 6000,
+        },
+      ],
+    };
+    const update = await app.inject({
+      method: 'POST',
+      payload: editInput,
+      url: `/v1/quotes/${created.json().id}/revisions`,
+    });
+    const retry = await app.inject({
+      method: 'POST',
+      payload: editInput,
+      url: `/v1/quotes/${created.json().id}/revisions`,
+    });
+    const detail = await app.inject({
+      method: 'GET',
+      url: `/v1/quotes/${created.json().id}`,
+    });
+
+    expect(update.statusCode).toBe(200);
+    expect(retry.statusCode).toBe(200);
+    expect(retry.json()).toEqual(update.json());
+    expect(update.json()).toMatchObject({
+      client: editInput.client,
+      revisionNumber: 2,
+      services: editInput.services,
+      totals: {
+        servicesInCents: 18000,
+        totalInCents: 23500,
+      },
+    });
+    expect(detail.json()).toMatchObject({
+      client: editInput.client,
+      revisionNumber: 2,
+      services: editInput.services,
+    });
+  });
+
   it('generates a PDF from the current validated quote revision', async () => {
     const profileService = new ProfileService(new MemoryProfileRepository());
     await profileService.update('test-user', {
