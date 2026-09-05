@@ -9,6 +9,8 @@ import { Prisma, type PrismaClient } from '@cotali/database';
 import { calculateLineTotalInCents } from '@cotali/domain';
 import {
   assertSameMutation,
+  QuoteUpdateError,
+  type PersistRevisionInput,
   type PersistDraftInput,
   type QuoteRepository,
 } from './quote-service.js';
@@ -28,7 +30,7 @@ export class PrismaQuoteRepository implements QuoteRepository {
         );
         if (previous) {
           assertSameMutation(previous.fingerprint, input.fingerprint);
-          return previous.quote;
+          return previous.quote as QuoteDraft;
         }
         if (attempt === 2) throw error;
       }
@@ -63,6 +65,27 @@ export class PrismaQuoteRepository implements QuoteRepository {
       status: mapQuoteStatus(quote.status),
       totalInCents: toSafeInteger(quote.totalCents),
     }));
+  }
+
+  async createRevision(input: PersistRevisionInput): Promise<QuoteDetails> {
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        return await this.persistRevision(input);
+      } catch (error) {
+        if (!isRetryableTransactionError(error)) throw error;
+        const previous = await this.findMutation(
+          input.authSubject,
+          input.input.mutationId,
+        );
+        if (previous) {
+          assertSameMutation(previous.fingerprint, input.fingerprint);
+          return previous.quote as unknown as QuoteDetails;
+        }
+        if (attempt === 2) throw error;
+      }
+    }
+
+    throw new Error('Unreachable transaction retry state.');
   }
 
   async getById(
@@ -201,17 +224,129 @@ export class PrismaQuoteRepository implements QuoteRepository {
     );
   }
 
+  private async persistRevision(
+    input: PersistRevisionInput,
+  ): Promise<QuoteDetails> {
+    return await this.prisma.$transaction(
+      async (transaction) => {
+        const account = await transaction.account.findUnique({
+          where: { authSubject: input.authSubject },
+        });
+        if (!account) {
+          throw new QuoteUpdateError(
+            'QUOTE_NOT_FOUND',
+            'The quote to update was not found.',
+          );
+        }
+
+        const previous = await transaction.mutation.findUnique({
+          where: {
+            accountId_mutationId: {
+              accountId: account.id,
+              mutationId: input.input.mutationId,
+            },
+          },
+        });
+        if (previous) {
+          assertSameMutation(previous.fingerprint, input.fingerprint);
+          return previous.result as unknown as QuoteDetails;
+        }
+
+        const quote = await transaction.quote.findFirst({
+          include: { currentRevision: true },
+          where: {
+            accountId: account.id,
+            deletedAt: null,
+            id: input.quoteId,
+          },
+        });
+        if (!quote || !quote.currentRevision) {
+          throw new QuoteUpdateError(
+            'QUOTE_NOT_FOUND',
+            'The quote to update was not found.',
+          );
+        }
+        if (quote.paymentStatus !== 'PENDING') {
+          throw new QuoteUpdateError(
+            'QUOTE_EDIT_NOT_ALLOWED',
+            'A quote with recorded payments cannot be edited.',
+          );
+        }
+
+        const revisionNumber = quote.currentRevision.revisionNumber + 1;
+        await transaction.client.update({
+          data: {
+            name: input.input.client.name,
+            phone: input.input.client.phone,
+          },
+          where: {
+            accountId_id: { accountId: account.id, id: quote.clientId },
+          },
+        });
+        const revision = await transaction.quoteRevision.create({
+          data: {
+            createdAt: new Date(),
+            discountCents: BigInt(input.quote.totals.discountInCents),
+            executionDeadline: input.input.conditions.executionDeadline,
+            installmentCount: input.input.conditions.installmentCount,
+            materials: { create: mapLines(input.input.materials) },
+            materialsSubtotal: BigInt(input.quote.totals.materialsInCents),
+            notes: input.input.conditions.notes,
+            paymentMethod: input.input.conditions.paymentMethod,
+            paymentPlanType: mapPaymentPlan(input.input),
+            quoteId: quote.id,
+            revisionNumber,
+            services: { create: mapLines(input.input.services) },
+            servicesSubtotal: BigInt(input.quote.totals.servicesInCents),
+            source: mapSource(input.input.source),
+            subtotalCents: BigInt(input.quote.totals.subtotalInCents),
+            totalCents: BigInt(input.quote.totals.totalInCents),
+            validUntil: input.input.conditions.validUntil
+              ? new Date(`${input.input.conditions.validUntil}T00:00:00.000Z`)
+              : null,
+          },
+        });
+
+        await transaction.quote.update({
+          data: {
+            currentRevisionId: revision.id,
+            totalCents: BigInt(input.quote.totals.totalInCents),
+          },
+          where: { id: quote.id },
+        });
+        const result: QuoteDetails = {
+          ...input.quote,
+          revisionNumber,
+        };
+        await transaction.mutation.create({
+          data: {
+            accountId: account.id,
+            commandType: 'UpdateQuoteRevision',
+            fingerprint: input.fingerprint,
+            mutationId: input.input.mutationId,
+            result: toJson(result),
+          },
+        });
+        return result;
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    );
+  }
+
   private async findMutation(
     authSubject: string,
     mutationId: string,
-  ): Promise<Readonly<{ fingerprint: string; quote: QuoteDraft }> | null> {
+  ): Promise<Readonly<{
+    fingerprint: string;
+    quote: QuoteDraft | QuoteDetails;
+  }> | null> {
     const mutation = await this.prisma.mutation.findFirst({
       where: { account: { authSubject }, mutationId },
     });
     return mutation
       ? {
           fingerprint: mutation.fingerprint,
-          quote: mutation.result as unknown as QuoteDraft,
+          quote: mutation.result as unknown as QuoteDraft | QuoteDetails,
         }
       : null;
   }
@@ -311,7 +446,7 @@ function nullableBigInt(value: number | null): bigint | null {
   return value === null ? null : BigInt(value);
 }
 
-function toJson(value: QuoteDraft): Prisma.InputJsonValue {
+function toJson(value: QuoteDraft | QuoteDetails): Prisma.InputJsonValue {
   return JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue;
 }
 

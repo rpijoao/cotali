@@ -1,5 +1,6 @@
 import { StatusBar } from 'expo-status-bar';
 import { useState } from 'react';
+import type { QuoteDetails } from '@cotali/contracts';
 import { HomeScreen } from './src/features/home/HomeScreen';
 import { ProfileScreen } from './src/features/profile/ProfileScreen';
 import { QuoteDetailScreen } from './src/features/quotes/QuoteDetailScreen';
@@ -9,6 +10,7 @@ export default function App() {
   const [screen, setScreen] = useState<
     | { kind: 'detail'; quoteId: string }
     | { kind: 'draft'; mode: 'new' | 'resume' }
+    | { kind: 'edit'; quote: QuoteDetails }
     | { kind: 'profile' }
     | { kind: 'home' }
   >({ kind: 'home' });
@@ -28,11 +30,22 @@ export default function App() {
           onSaved={() => setScreen({ kind: 'home' })}
           startFresh={screen.mode === 'new'}
         />
+      ) : screen.kind === 'edit' ? (
+        <QuoteDraftScreen
+          editingQuote={screen.quote}
+          onBackToHome={() =>
+            setScreen({ kind: 'detail', quoteId: screen.quote.id })
+          }
+          onSaved={() =>
+            setScreen({ kind: 'detail', quoteId: screen.quote.id })
+          }
+        />
       ) : screen.kind === 'profile' ? (
         <ProfileScreen onBack={() => setScreen({ kind: 'home' })} />
       ) : (
         <QuoteDetailScreen
           onBack={() => setScreen({ kind: 'home' })}
+          onEdit={(quote) => setScreen({ kind: 'edit', quote })}
           quoteId={screen.quoteId}
         />
       )}

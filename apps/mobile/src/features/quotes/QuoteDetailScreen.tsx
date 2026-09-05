@@ -18,9 +18,11 @@ import { formatBrl } from './money';
 
 export function QuoteDetailScreen({
   onBack,
+  onEdit,
   quoteId,
 }: Readonly<{
   onBack: () => void;
+  onEdit: (quote: QuoteDetails) => void;
   quoteId: string;
 }>) {
   const [quote, setQuote] = useState<QuoteDetails | null>(null);
@@ -141,12 +143,30 @@ export function QuoteDetailScreen({
         </Text>
       </View>
 
+      <View style={styles.editCard}>
+        <View style={styles.pdfCopy}>
+          <Text style={styles.pdfTitle}>Precisa corrigir algo?</Text>
+          <Text style={styles.pdfDescription}>
+            Edite os dados e salve uma nova revisão. A revisão atual continuará
+            preservada no histórico.
+          </Text>
+        </View>
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => onEdit(quote)}
+          style={styles.editButton}
+        >
+          <Text style={styles.editButtonText}>Editar orçamento</Text>
+        </Pressable>
+      </View>
+
       <View style={styles.whatsAppCard}>
         <View style={styles.pdfCopy}>
           <Text style={styles.pdfTitle}>Enviar pelo WhatsApp</Text>
           <Text style={styles.pdfDescription}>
-            Gere o PDF e prepare uma mensagem para o WhatsApp com os dados deste
-            cliente.
+            Gere o PDF e prepare uma mensagem para o WhatsApp. Se o telefone do
+            cliente não estiver disponível, você poderá escolher a conversa
+            manualmente.
           </Text>
         </View>
         <Pressable
@@ -407,6 +427,25 @@ const styles = StyleSheet.create({
     marginTop: 14,
     padding: 18,
   },
+  editCard: {
+    backgroundColor: '#FFFFFF',
+    borderColor: '#DDE6E0',
+    borderRadius: 18,
+    borderWidth: 1,
+    marginTop: 14,
+    padding: 18,
+  },
+  editButton: {
+    alignItems: 'center',
+    borderColor: '#1846E1',
+    borderRadius: 12,
+    borderWidth: 1,
+    minHeight: 48,
+    justifyContent: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  editButtonText: { color: '#1846E1', fontSize: 14, fontWeight: '800' },
   whatsAppCard: {
     backgroundColor: '#EAF0FF',
     borderColor: '#1846E1',

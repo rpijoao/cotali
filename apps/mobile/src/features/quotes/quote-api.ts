@@ -3,6 +3,7 @@ import type {
   QuoteDetails,
   QuoteDraft,
   QuoteSummary,
+  UpdateQuoteRevision,
   VoiceQuoteEditContext,
   VoiceQuoteEditInterpretation,
   VoiceInterpretation,
@@ -41,6 +42,38 @@ export async function createQuoteDraft(
   }
 
   return body as QuoteDraft;
+}
+
+export async function updateQuoteRevision(
+  quoteId: string,
+  input: UpdateQuoteRevision,
+): Promise<QuoteDetails> {
+  if (!developmentToken) {
+    throw new Error('A sessão autenticada ainda não foi configurada.');
+  }
+
+  const response = await fetch(
+    `${apiUrl}/v1/quotes/${encodeURIComponent(quoteId)}/revisions`,
+    {
+      body: JSON.stringify(input),
+      headers: {
+        authorization: `Bearer ${developmentToken}`,
+        'content-type': 'application/json',
+      },
+      method: 'POST',
+    },
+  );
+  const body: unknown = await response.json();
+
+  if (!response.ok) {
+    throw new Error(
+      readApiMessage(body) ?? 'Não foi possível atualizar o orçamento.',
+    );
+  }
+  if (!isQuoteDetails(body)) {
+    throw new Error('A API retornou um orçamento inválido.');
+  }
+  return body;
 }
 
 export async function listQuoteSummaries(): Promise<QuoteSummary[]> {
@@ -124,15 +157,7 @@ export async function downloadQuoteProposal(quoteId: string): Promise<File> {
 
 export async function shareQuoteProposal(quoteId: string): Promise<void> {
   const file = await downloadQuoteProposal(quoteId);
-  if (!(await Sharing.isAvailableAsync())) {
-    throw new Error(
-      'O compartilhamento não está disponível neste dispositivo.',
-    );
-  }
-  await Sharing.shareAsync(file.uri, {
-    dialogTitle: 'Compartilhar orçamento',
-    mimeType: 'application/pdf',
-  });
+  await sharePdfWithSystemSheet(file.uri);
 }
 
 export async function shareQuoteProposalToWhatsApp(input: {
@@ -141,12 +166,6 @@ export async function shareQuoteProposalToWhatsApp(input: {
   quoteId: string;
 }): Promise<void> {
   const phone = normalizeWhatsAppPhone(input.clientPhone);
-  if (!phone) {
-    throw new Error(
-      'Informe um WhatsApp válido para o cliente antes de enviar direto.',
-    );
-  }
-
   const nativeShare =
     Platform.OS === 'android' || Platform.OS === 'ios'
       ? await loadNativeShare()
@@ -155,34 +174,27 @@ export async function shareQuoteProposalToWhatsApp(input: {
   const clientName = input.clientName.trim() || 'cliente';
   const message = `Olá, ${clientName}! Segue sua proposta comercial do Cotali em PDF.`;
 
-  if (Platform.OS === 'android') {
-    if (!nativeShare) {
-      throw new Error(
-        'O envio direto pelo WhatsApp exige um development build do Cotali.',
-      );
-    }
-    await nativeShare.shareSingle({
+  if (Platform.OS === 'android' && nativeShare) {
+    const options = {
       filename: `cotali-orcamento-${input.quoteId}.pdf`,
       message,
       social: nativeShare.Social.WHATSAPP,
       title: 'Proposta Cotali',
       type: 'application/pdf',
       url: file.uri,
+    } as WhatsAppShareOptions;
+    if (phone) {
       // The library supports this Android option, but it is not in its public
       // TypeScript definition yet.
-      whatsAppNumber: phone,
-    } as WhatsAppShareOptions);
+      options.whatsAppNumber = phone;
+    }
+    await nativeShare.shareSingle(options);
     return;
   }
 
-  if (Platform.OS === 'ios') {
+  if (Platform.OS === 'ios' && nativeShare) {
     // iOS shareSingle treats a PDF URL as text. The native share sheet keeps
     // the PDF as an attachment and lets the user choose WhatsApp.
-    if (!nativeShare) {
-      throw new Error(
-        'O envio direto pelo WhatsApp exige um development build do Cotali.',
-      );
-    }
     await nativeShare.open({
       message,
       title: 'Proposta Cotali',
@@ -192,35 +204,35 @@ export async function shareQuoteProposalToWhatsApp(input: {
     return;
   }
 
+  await sharePdfWithSystemSheet(file.uri);
+}
+
+type WhatsAppShareOptions = Parameters<typeof NativeShare.shareSingle>[0] & {
+  whatsAppNumber?: string;
+};
+
+async function sharePdfWithSystemSheet(uri: string): Promise<void> {
   if (!(await Sharing.isAvailableAsync())) {
     throw new Error(
       'O compartilhamento não está disponível neste dispositivo.',
     );
   }
-  await Sharing.shareAsync(file.uri, {
+  await Sharing.shareAsync(uri, {
     dialogTitle: 'Compartilhar orçamento',
     mimeType: 'application/pdf',
   });
 }
 
-type WhatsAppShareOptions = Parameters<typeof NativeShare.shareSingle>[0] & {
-  whatsAppNumber: string;
-};
-
 type NativeShareModule = typeof NativeShare;
 
-async function loadNativeShare(): Promise<NativeShareModule> {
+async function loadNativeShare(): Promise<NativeShareModule | null> {
   if (!TurboModuleRegistry.get('RNShare')) {
-    throw new Error(
-      'O envio direto pelo WhatsApp exige um development build do Cotali.',
-    );
+    return null;
   }
   try {
     return (await import('react-native-share')).default;
   } catch {
-    throw new Error(
-      'O envio direto pelo WhatsApp exige um development build do Cotali.',
-    );
+    return null;
   }
 }
 
@@ -299,7 +311,7 @@ async function appendAudioPart(form: FormData, uri: string): Promise<void> {
   if (Platform.OS === 'web') {
     const response = await fetch(uri);
     if (!response.ok) {
-      throw new Error('NÃ£o foi possÃ­vel ler a gravaÃ§Ã£o no navegador.');
+      throw new Error('Não foi possível ler a gravação no navegador.');
     }
     const blob = await response.blob();
     form.append('audio', blob, audioFilename(blob.type));

@@ -16,6 +16,7 @@ export type LocalQuoteDraft = Readonly<{
   paymentPlan: PaymentPlan;
   source: QuoteSource;
   services: EditableQuoteLine[];
+  validUntil?: string;
   version: 1;
 }>;
 
@@ -26,6 +27,7 @@ export function hasLocalQuoteDraftContent(draft: LocalQuoteDraft): boolean {
     draft.discount.trim() !== '' ||
     draft.executionDeadline.trim() !== '' ||
     draft.installmentCount !== '2' ||
+    (draft.validUntil?.trim() ?? '') !== '' ||
     draft.materials.some(
       (line) => line.description.trim() !== '' || line.unitPrice !== '',
     ) ||
@@ -47,6 +49,12 @@ export function parseLocalQuoteDraft(value: string): LocalQuoteDraft | null {
     if (
       !isQuoteLines(candidate.services) ||
       !isQuoteLines(candidate.materials)
+    ) {
+      return null;
+    }
+    if (
+      candidate.validUntil !== undefined &&
+      typeof candidate.validUntil !== 'string'
     ) {
       return null;
     }

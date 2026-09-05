@@ -4,7 +4,9 @@ import {
   QuoteDetailsSchema,
   QuoteSummaryListSchema,
   QuoteDraftSchema,
+  UpdateQuoteRevisionSchema,
   type CreateQuoteDraft,
+  type UpdateQuoteRevision,
 } from '@cotali/contracts';
 import { Type } from '@sinclair/typebox';
 import { QuoteDomainError } from '@cotali/domain';
@@ -14,7 +16,11 @@ import {
   type Authenticator,
 } from '../auth/authenticator.js';
 import type { ProfileService } from '../profile/profile-service.js';
-import { CreateQuoteError, type QuoteService } from './quote-service.js';
+import {
+  CreateQuoteError,
+  QuoteUpdateError,
+  type QuoteService,
+} from './quote-service.js';
 import { renderQuotePdf } from './quote-pdf.js';
 
 export async function registerQuoteRoutes(
@@ -179,6 +185,68 @@ export async function registerQuoteRoutes(
           });
         }
 
+        throw error;
+      }
+    },
+  );
+
+  app.post<{
+    Body: UpdateQuoteRevision;
+    Params: { id: string };
+  }>(
+    '/v1/quotes/:id/revisions',
+    {
+      schema: {
+        body: UpdateQuoteRevisionSchema,
+        params: Type.Object({ id: Type.String({ format: 'uuid' }) }),
+        response: {
+          200: QuoteDetailsSchema,
+          401: ApiErrorSchema,
+          404: ApiErrorSchema,
+          409: ApiErrorSchema,
+          422: ApiErrorSchema,
+        },
+        tags: ['quotes'],
+      },
+    },
+    async (request, reply) => {
+      try {
+        const identity = await authenticator.authenticate(
+          request.headers.authorization,
+        );
+        return await quoteService.updateDraft(
+          identity.subject,
+          request.params.id,
+          request.body,
+        );
+      } catch (error) {
+        if (error instanceof AuthenticationError) {
+          return await reply.status(401).send({
+            error: { code: 'AUTHENTICATION_REQUIRED', message: error.message },
+          });
+        }
+        if (error instanceof CreateQuoteError) {
+          const status = error.code === 'IDEMPOTENCY_KEY_REUSED' ? 409 : 422;
+          return await reply.status(status).send({
+            error: { code: error.code, message: error.message },
+          });
+        }
+        if (error instanceof QuoteUpdateError) {
+          const status =
+            error.code === 'IDEMPOTENCY_KEY_REUSED'
+              ? 409
+              : error.code === 'QUOTE_NOT_FOUND'
+                ? 404
+                : 422;
+          return await reply.status(status).send({
+            error: { code: error.code, message: error.message },
+          });
+        }
+        if (error instanceof QuoteDomainError) {
+          return await reply.status(422).send({
+            error: { code: error.code, message: error.message },
+          });
+        }
         throw error;
       }
     },

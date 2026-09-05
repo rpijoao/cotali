@@ -1,5 +1,6 @@
 import type {
   CreateQuoteDraft,
+  QuoteDetails,
   VoiceQuoteEditInterpretation,
   VoiceInterpretation,
 } from '@cotali/contracts';
@@ -28,6 +29,7 @@ import {
   createQuoteDraft,
   interpretQuoteEdit,
   interpretQuoteVoice,
+  updateQuoteRevision,
 } from './quote-api';
 import {
   clearLocalQuoteDraft,
@@ -52,14 +54,18 @@ const emptyLine = (): EditableQuoteLine => ({
   unit: 'un',
   unitPrice: '',
 });
+const NO_OP_EDIT_MESSAGE =
+  'Não identificamos uma alteração aplicável. Diga um ajuste específico para um serviço, material ou nome de cliente.';
 
 type QuoteDraftStep = 'capture' | 'details';
 
 export function QuoteDraftScreen({
+  editingQuote,
   onBackToHome,
   onSaved,
   startFresh = false,
 }: Readonly<{
+  editingQuote?: QuoteDetails;
   onBackToHome?: () => void;
   onSaved?: () => void;
   startFresh?: boolean;
@@ -74,6 +80,7 @@ export function QuoteDraftScreen({
   const [source, setSource] = useState<QuoteSource>('manual');
   const [installmentCount, setInstallmentCount] = useState('2');
   const [executionDeadline, setExecutionDeadline] = useState('');
+  const [validUntil, setValidUntil] = useState('');
   const [notes, setNotes] = useState('');
   const [mutationId, setMutationId] = useState(randomUUID);
   const [voiceMutationId, setVoiceMutationId] = useState(randomUUID);
@@ -121,6 +128,7 @@ export function QuoteDraftScreen({
       paymentPlan,
       source,
       services,
+      validUntil,
       version: 1,
     }),
     [
@@ -136,11 +144,35 @@ export function QuoteDraftScreen({
       paymentPlan,
       source,
       services,
+      validUntil,
     ],
   );
 
   useEffect(() => {
     let active = true;
+    if (editingQuote) {
+      setClientName(editingQuote.client.name);
+      setClientPhone(editingQuote.client.phone ?? '');
+      setDiscount(String(editingQuote.discountInCents));
+      setExecutionDeadline(editingQuote.conditions.executionDeadline ?? '');
+      setInstallmentCount(
+        editingQuote.conditions.installmentCount === null
+          ? '2'
+          : String(editingQuote.conditions.installmentCount),
+      );
+      setMaterials(editingQuote.materials.map(toEditableLine));
+      setNotes(editingQuote.conditions.notes ?? '');
+      setPaymentMethod(editingQuote.conditions.paymentMethod ?? '');
+      setPaymentPlan(editingQuote.conditions.paymentPlanType);
+      setSource(editingQuote.source);
+      setServices(editingQuote.services.map(toEditableLine));
+      setValidUntil(editingQuote.conditions.validUntil ?? '');
+      setStep('details');
+      setHydrated(true);
+      return () => {
+        active = false;
+      };
+    }
     if (startFresh) {
       void clearLocalQuoteDraft()
         .catch(() => setPersistenceStatus('error'))
@@ -166,6 +198,7 @@ export function QuoteDraftScreen({
         setPaymentPlan(draft.paymentPlan);
         setSource(draft.source);
         setServices(draft.services);
+        setValidUntil(draft.validUntil ?? '');
         if (hasLocalQuoteDraftContent(draft)) setStep('details');
       })
       .catch(() => setPersistenceStatus('error'))
@@ -175,10 +208,10 @@ export function QuoteDraftScreen({
     return () => {
       active = false;
     };
-  }, [startFresh]);
+  }, [editingQuote, startFresh]);
 
   useEffect(() => {
-    if (!hydrated) return;
+    if (!hydrated || editingQuote) return;
     setPersistenceStatus('pending');
     const timeout = setTimeout(() => {
       void saveLocalQuoteDraft(localDraft)
@@ -186,7 +219,7 @@ export function QuoteDraftScreen({
         .catch(() => setPersistenceStatus('error'));
     }, 400);
     return () => clearTimeout(timeout);
-  }, [hydrated, localDraft]);
+  }, [editingQuote, hydrated, localDraft]);
 
   const totals = useMemo(() => {
     try {
@@ -222,6 +255,12 @@ export function QuoteDraftScreen({
           throw new Error('Informe entre 2 e 24 parcelas.');
         }
       }
+      if (
+        validUntil.trim() !== '' &&
+        !/^\d{4}-\d{2}-\d{2}$/.test(validUntil.trim())
+      ) {
+        throw new Error('Informe a validade no formato AAAA-MM-DD.');
+      }
 
       calculateQuoteTotals({
         discountInCents: parseBrlInput(discount) ?? 0,
@@ -244,12 +283,16 @@ export function QuoteDraftScreen({
     setSaving(true);
 
     try {
-      const quote = await createQuoteDraft(submission);
+      const quote = editingQuote
+        ? await updateQuoteRevision(editingQuote.id, submission)
+        : await createQuoteDraft(submission);
       Alert.alert(
-        'Orçamento salvo',
-        `Rascunho ${quote.id.slice(0, 8)} criado com sucesso.`,
+        editingQuote ? 'Orçamento atualizado' : 'Orçamento salvo',
+        editingQuote
+          ? `Revisão ${quote.revisionNumber} salva com sucesso.`
+          : `Rascunho ${quote.id.slice(0, 8)} criado com sucesso.`,
       );
-      await clearLocalQuoteDraft();
+      if (!editingQuote) await clearLocalQuoteDraft();
       resetForm();
       onSaved?.();
     } catch (error) {
@@ -316,13 +359,14 @@ export function QuoteDraftScreen({
       });
       setEditResult(result);
       setEditStatus('ready');
+      const isNoOp = result.command.intent === 'no_op';
       Alert.alert(
-        result.command.intent === 'no_op'
-          ? 'Comando não identificado'
-          : 'Alteração sugerida',
-        result.command.ambiguities.length
-          ? result.command.ambiguities.join(' ')
-          : 'Confira a alteração e toque em aplicar para confirmar.',
+        isNoOp ? 'Nenhuma alteração identificada' : 'Alteração sugerida',
+        isNoOp
+          ? NO_OP_EDIT_MESSAGE
+          : result.command.ambiguities.length
+            ? result.command.ambiguities.join(' ')
+            : 'Confira a alteração e toque em aplicar para confirmar.',
       );
     } catch (error) {
       setEditStatus('failed');
@@ -457,10 +501,6 @@ export function QuoteDraftScreen({
     setStep('details');
   }
 
-  function returnToCapture() {
-    setStep('capture');
-  }
-
   function resetVoiceCapture() {
     setRecording(null);
     setTranscript(null);
@@ -513,7 +553,7 @@ export function QuoteDraftScreen({
         notes: notes.trim() || null,
         paymentMethod: paymentMethod.trim() || null,
         paymentPlanType: paymentPlan,
-        validUntil: null,
+        validUntil: validUntil.trim() || null,
       },
       discountInCents: parseBrlInput(discount) ?? 0,
       materials: materials.map(toDomainLine),
@@ -534,6 +574,7 @@ export function QuoteDraftScreen({
     setSource('manual');
     setInstallmentCount('2');
     setExecutionDeadline('');
+    setValidUntil('');
     setNotes('');
     setMutationId(randomUUID());
     setPendingSubmission(null);
@@ -555,7 +596,9 @@ export function QuoteDraftScreen({
       <ScrollView contentContainerStyle={styles.screen}>
         {onBackToHome && (
           <Pressable onPress={onBackToHome} style={styles.backLink}>
-            <Text style={styles.backLinkText}>← Início</Text>
+            <Text style={styles.backLinkText}>
+              {editingQuote ? '← Voltar ao orçamento' : '← Início'}
+            </Text>
           </Pressable>
         )}
         <Text style={styles.eyebrow}>REVISÃO DO ORÇAMENTO</Text>
@@ -580,6 +623,9 @@ export function QuoteDraftScreen({
             label="Execução"
             value={executionDeadline || 'Não informado'}
           />
+          {validUntil !== '' && (
+            <ReviewRow label="Validade" value={validUntil} />
+          )}
           {notes !== '' && <Text style={styles.notes}>{notes}</Text>}
         </Section>
         <View style={styles.totalCard}>
@@ -636,7 +682,9 @@ export function QuoteDraftScreen({
         >
           {onBackToHome && (
             <Pressable onPress={onBackToHome} style={styles.backLink}>
-              <Text style={styles.backLinkText}>← Início</Text>
+              <Text style={styles.backLinkText}>
+                {editingQuote ? '← Voltar ao orçamento' : '← Início'}
+              </Text>
             </Pressable>
           )}
           <Text style={styles.eyebrow}>ETAPA 1 DE 2</Text>
@@ -737,7 +785,9 @@ export function QuoteDraftScreen({
       >
         {onBackToHome && (
           <Pressable onPress={onBackToHome} style={styles.backLink}>
-            <Text style={styles.backLinkText}>← Início</Text>
+            <Text style={styles.backLinkText}>
+              {editingQuote ? '← Voltar ao orçamento' : '← Início'}
+            </Text>
           </Pressable>
         )}
         <Text style={styles.eyebrow}>ETAPA 2 DE 2</Text>
@@ -745,9 +795,32 @@ export function QuoteDraftScreen({
         <Text style={styles.subtitle}>
           Revise e complete as informações antes de salvar o orçamento.
         </Text>
-        <Pressable onPress={returnToCapture} style={styles.backLink}>
-          <Text style={styles.backLinkText}>← Voltar para áudio</Text>
-        </Pressable>
+        {editingQuote && (
+          <Text style={styles.editingNotice}>
+            Você está editando a revisão {editingQuote.revisionNumber}. Ao
+            salvar, uma nova revisão será criada e a anterior ficará preservada.
+          </Text>
+        )}
+        {!transcript && (
+          <View style={styles.voiceRestartCard}>
+            <Text style={styles.voiceRestartTitle}>
+              Quer gravar uma nova descrição?
+            </Text>
+            <Text style={styles.commandHint}>
+              Use esta opção para descrever o orçamento inteiro novamente.
+              Depois do processamento, confira a transcrição antes de continuar
+              para os dados.
+            </Text>
+            <Pressable
+              onPress={resetVoiceCapture}
+              style={styles.secondaryButton}
+            >
+              <Text style={styles.secondaryButtonText}>
+                Gravar nova descrição completa
+              </Text>
+            </Pressable>
+          </View>
+        )}
         {transcript && (
           <View style={styles.transcriptSummary}>
             <Text style={styles.transcriptEyebrow}>TRANSCRIÇÃO CONFERIDA</Text>
@@ -762,24 +835,26 @@ export function QuoteDraftScreen({
             </Pressable>
           </View>
         )}
-        <Text
-          style={
-            persistenceStatus === 'error'
-              ? styles.persistenceError
-              : styles.persistenceStatus
-          }
-        >
-          {persistenceStatus === 'saved'
-            ? 'Rascunho salvo neste aparelho'
-            : persistenceStatus === 'error'
-              ? 'Não foi possível salvar o rascunho local'
-              : 'Salvando rascunho…'}
-        </Text>
+        {!editingQuote && (
+          <Text
+            style={
+              persistenceStatus === 'error'
+                ? styles.persistenceError
+                : styles.persistenceStatus
+            }
+          >
+            {persistenceStatus === 'saved'
+              ? 'Rascunho salvo neste aparelho'
+              : persistenceStatus === 'error'
+                ? 'Não foi possível salvar o rascunho local'
+                : 'Salvando rascunho…'}
+          </Text>
+        )}
         <Section title="Ajuste por voz">
           <Text style={styles.commandHint}>
-            Depois de conferir os dados, diga uma alteração específica, como
-            “altere o primeiro serviço para 3 unidades” ou “altere o nome do
-            cliente para Roberto Pedro Pereira”.
+            Use este bloco somente para corrigir um dado específico depois de
+            revisar o orçamento, como “altere o primeiro serviço para 3
+            unidades” ou “altere o nome do cliente para Roberto Pedro Pereira”.
           </Text>
           <VoiceCaptureCard
             mode="edit"
@@ -807,7 +882,9 @@ export function QuoteDraftScreen({
               {editStatus === 'processing'
                 ? 'Enviando o comando…'
                 : editStatus === 'ready'
-                  ? 'Comando recebido. Confira a sugestão abaixo.'
+                  ? editResult?.command.intent === 'no_op'
+                    ? `${NO_OP_EDIT_MESSAGE} Grave um ajuste específico ou use a opção de nova descrição acima.`
+                    : 'Comando recebido. Confira a sugestão abaixo.'
                   : editStatus === 'failed'
                     ? 'O processamento falhou. Você pode tentar novamente.'
                     : 'Áudio capturado. Toque em Processar áudio.'}
@@ -815,7 +892,11 @@ export function QuoteDraftScreen({
           )}
           {editResult && editStatus === 'ready' && (
             <View style={styles.editPreviewCard}>
-              <Text style={styles.transcriptEyebrow}>COMANDO IDENTIFICADO</Text>
+              <Text style={styles.transcriptEyebrow}>
+                {editResult.command.intent === 'no_op'
+                  ? 'AJUSTE NÃO IDENTIFICADO'
+                  : 'COMANDO IDENTIFICADO'}
+              </Text>
               <Text selectable style={styles.transcriptText}>
                 {editResult.transcript}
               </Text>
@@ -827,11 +908,12 @@ export function QuoteDraftScreen({
                   materials,
                 )}
               </Text>
-              {editResult.command.ambiguities.length > 0 && (
-                <Text style={styles.persistenceError}>
-                  {editResult.command.ambiguities.join(' ')}
-                </Text>
-              )}
+              {editResult.command.ambiguities.length > 0 &&
+                editResult.command.intent !== 'no_op' && (
+                  <Text style={styles.persistenceError}>
+                    {editResult.command.ambiguities.join(' ')}
+                  </Text>
+                )}
               <Pressable
                 disabled={!isApplicableEditCommand(editResult.command)}
                 onPress={applyEditCommand}
@@ -955,6 +1037,16 @@ export function QuoteDraftScreen({
               placeholderTextColor="#829087"
               style={styles.input}
               value={executionDeadline}
+            />
+          </Field>
+          <Field label="Validade da proposta">
+            <TextInput
+              autoCapitalize="none"
+              onChangeText={setValidUntil}
+              placeholder="AAAA-MM-DD"
+              placeholderTextColor="#829087"
+              style={styles.input}
+              value={validUntil}
             />
           </Field>
           <Field label="Desconto">
@@ -1337,6 +1429,14 @@ const styles = StyleSheet.create({
   segmentText: { color: '#526A5E', fontSize: 12, fontWeight: '700' },
   segmentTextActive: { color: '#FFFFFF' },
   subtitle: { color: '#5A7064', fontSize: 16, lineHeight: 23 },
+  editingNotice: {
+    backgroundColor: '#E4F0E9',
+    borderRadius: 12,
+    color: '#315D49',
+    fontSize: 13,
+    lineHeight: 19,
+    padding: 12,
+  },
   transcriptCard: {
     backgroundColor: '#FFFFFF',
     borderColor: '#CBD8D0',
@@ -1360,6 +1460,13 @@ const styles = StyleSheet.create({
   },
   transcriptText: { color: '#19372A', fontSize: 16, lineHeight: 24 },
   transcriptTitle: { color: '#19372A', fontSize: 19, fontWeight: '800' },
+  voiceRestartCard: {
+    backgroundColor: '#E4F0E9',
+    borderRadius: 16,
+    gap: 10,
+    padding: 15,
+  },
+  voiceRestartTitle: { color: '#19372A', fontSize: 16, fontWeight: '800' },
   undoCard: {
     backgroundColor: '#FFF8E8',
     borderColor: '#E4C982',
