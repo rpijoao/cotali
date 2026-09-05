@@ -190,6 +190,7 @@ describe('POST /v1/voice/commands', () => {
     });
     expect(interpreter.lastRequest).toMatchObject({
       draft: {
+        client: { name: 'Roberto', phone: '' },
         services: [{ description: 'Troca de tomada', quantity: '2' }],
       },
       filename: 'command.m4a',
@@ -276,6 +277,7 @@ class FakeVoiceCommandInterpreter implements VoiceCommandInterpreter {
       command: {
         ambiguities: [],
         changes: {
+          clientName: null,
           description: null,
           quantity: '3',
           unit: null,
@@ -352,6 +354,7 @@ function commandMultipartBody(mutationId: string): Buffer {
       'Content-Disposition: form-data; name="draft"',
       '',
       JSON.stringify({
+        client: { name: 'Roberto', phone: '' },
         materials: [],
         services: [
           {

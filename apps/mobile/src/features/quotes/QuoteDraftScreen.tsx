@@ -4,6 +4,7 @@ import type {
   VoiceInterpretation,
 } from '@cotali/contracts';
 import {
+  applyQuoteClientNameEdit,
   applyQuoteLineEdit,
   calculateLineTotalInCents,
   calculateQuoteTotals,
@@ -94,6 +95,7 @@ export function QuoteDraftScreen({
     'failed' | 'idle' | 'processing' | 'ready'
   >('idle');
   const [lastEditUndo, setLastEditUndo] = useState<{
+    clientName: string;
     materials: EditableQuoteLine[];
     services: EditableQuoteLine[];
     source: QuoteSource;
@@ -302,6 +304,10 @@ export function QuoteDraftScreen({
     try {
       const result = await interpretQuoteEdit({
         draft: {
+          client: {
+            name: clientName.trim(),
+            phone: clientPhone.trim(),
+          },
           materials: materials.map(toEditContextLine),
           services: services.map(toEditContextLine),
         },
@@ -331,18 +337,17 @@ export function QuoteDraftScreen({
 
   function applyEditCommand() {
     const command = editResult?.command;
-    if (!command || command.intent !== 'update_line') {
+    if (
+      !command ||
+      (command.intent !== 'update_line' && command.intent !== 'update_client')
+    ) {
       Alert.alert(
         'Comando não aplicado',
-        'Diga qual serviço ou material deve ser alterado e tente novamente.',
+        'Diga qual serviço, material ou nome de cliente deve ser alterado e tente novamente.',
       );
       return;
     }
-    if (
-      command.section === null ||
-      command.index === null ||
-      command.ambiguities.length > 0
-    ) {
+    if (command.ambiguities.length > 0) {
       Alert.alert(
         'Preciso de mais detalhes',
         command.ambiguities.join(' ') ||
@@ -352,7 +357,50 @@ export function QuoteDraftScreen({
     }
 
     try {
-      const previous = { materials, services, source };
+      const previous = { clientName, materials, services, source };
+      if (command.intent === 'update_client') {
+        if (
+          command.section !== 'client' ||
+          command.index !== null ||
+          command.changes.clientName === null ||
+          hasLineChange(command)
+        ) {
+          Alert.alert(
+            'Alteração não aplicada',
+            'Não foi possível identificar um novo nome de cliente válido.',
+          );
+          return;
+        }
+        const nextName = applyQuoteClientNameEdit({
+          name: command.changes.clientName,
+        });
+        setClientName(nextName);
+        setLastEditUndo(previous);
+        setSource('mixed');
+        setEditRecording(null);
+        setEditResult(null);
+        setEditMutationId(randomUUID());
+        setEditStatus('idle');
+        Alert.alert(
+          'Alteração aplicada',
+          'Confira o nome do cliente antes de revisar.',
+        );
+        return;
+      }
+
+      if (
+        command.section === null ||
+        command.section === 'client' ||
+        command.index === null ||
+        command.changes.clientName !== null
+      ) {
+        Alert.alert(
+          'Alteração não aplicada',
+          'Não foi possível identificar uma linha de serviço ou material.',
+        );
+        return;
+      }
+
       const result = applyQuoteLineEdit({
         materials: materials.map(toDomainLine),
         services: services.map(toDomainLine),
@@ -396,6 +444,7 @@ export function QuoteDraftScreen({
 
   function undoLastEdit() {
     if (!lastEditUndo) return;
+    setClientName(lastEditUndo.clientName);
     setServices(lastEditUndo.services);
     setMaterials(lastEditUndo.materials);
     setSource(lastEditUndo.source);
@@ -729,7 +778,8 @@ export function QuoteDraftScreen({
         <Section title="Ajuste por voz">
           <Text style={styles.commandHint}>
             Depois de conferir os dados, diga uma alteração específica, como
-            “altere o primeiro serviço para 3 unidades”.
+            “altere o primeiro serviço para 3 unidades” ou “altere o nome do
+            cliente para Roberto Pedro Pereira”.
           </Text>
           <VoiceCaptureCard
             mode="edit"
@@ -770,7 +820,12 @@ export function QuoteDraftScreen({
                 {editResult.transcript}
               </Text>
               <Text style={styles.editPreviewText}>
-                {describeEditCommand(editResult, services, materials)}
+                {describeEditCommand(
+                  editResult,
+                  clientName,
+                  services,
+                  materials,
+                )}
               </Text>
               {editResult.command.ambiguities.length > 0 && (
                 <Text style={styles.persistenceError}>
@@ -778,19 +833,11 @@ export function QuoteDraftScreen({
                 </Text>
               )}
               <Pressable
-                disabled={
-                  editResult.command.intent !== 'update_line' ||
-                  editResult.command.section === null ||
-                  editResult.command.index === null ||
-                  editResult.command.ambiguities.length > 0
-                }
+                disabled={!isApplicableEditCommand(editResult.command)}
                 onPress={applyEditCommand}
                 style={[
                   styles.primaryButton,
-                  (editResult.command.intent !== 'update_line' ||
-                    editResult.command.section === null ||
-                    editResult.command.index === null ||
-                    editResult.command.ambiguities.length > 0) &&
+                  !isApplicableEditCommand(editResult.command) &&
                     styles.disabledButton,
                 ]}
               >
@@ -1088,10 +1135,19 @@ function paymentPlanLabel(plan: PaymentPlan, count: string): string {
 
 function describeEditCommand(
   result: VoiceQuoteEditInterpretation,
+  clientName: string,
   services: readonly EditableQuoteLine[],
   materials: readonly EditableQuoteLine[],
 ): string {
   const { command } = result;
+  if (
+    command.intent === 'update_client' &&
+    command.section === 'client' &&
+    command.index === null &&
+    command.changes.clientName !== null
+  ) {
+    return `Nome do cliente: “${clientName || 'não informado'}” para “${command.changes.clientName}”.`;
+  }
   if (
     command.intent !== 'update_line' ||
     command.section === null ||
@@ -1114,6 +1170,40 @@ function describeEditCommand(
             ? `preço para ${formatBrl(command.changes.unitPriceInCents)}`
             : 'sem alteração identificada';
   return `${label} ${command.index + 1}: ${change}.`;
+}
+
+function isApplicableEditCommand(
+  command: VoiceQuoteEditInterpretation['command'],
+): boolean {
+  if (command.ambiguities.length > 0) return false;
+  if (command.intent === 'update_client') {
+    return (
+      command.section === 'client' &&
+      command.index === null &&
+      command.changes.clientName !== null &&
+      !hasLineChange(command)
+    );
+  }
+  if (
+    command.intent !== 'update_line' ||
+    (command.section !== 'services' && command.section !== 'materials') ||
+    command.index === null ||
+    command.changes.clientName !== null
+  ) {
+    return false;
+  }
+  return hasLineChange(command);
+}
+
+function hasLineChange(
+  command: VoiceQuoteEditInterpretation['command'],
+): boolean {
+  return [
+    command.changes.description,
+    command.changes.quantity,
+    command.changes.unit,
+    command.changes.unitPriceInCents,
+  ].some((value) => value !== null);
 }
 
 function normalizePhone(value: string): string | null {

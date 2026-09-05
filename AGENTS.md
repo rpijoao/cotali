@@ -19,6 +19,17 @@ Antes de propor ou implementar uma mudança voltada ao usuário, leia:
 - Prefira defaults que ajudem o usuário a concluir o trabalho, mas nunca esconda decisões financeiras ou dados importantes.
 - Meça o comportamento que representa valor entregue, não apenas cliques ou volume de features.
 
+## Regra para "próximo passo"
+
+Quando o usuário perguntar pelo próximo passo, o agente deverá:
+
+- verificar o estado atual do repositório, dos testes, dos commits e dos documentos relevantes antes de recomendar qualquer coisa;
+- separar explicitamente o marco de produto da tarefa técnica imediata que o viabiliza;
+- escolher uma única próxima tarefa concreta, com justificativa baseada em evidência do estado atual;
+- mencionar etapas posteriores somente como contexto, sem apresentá-las como alternativas concorrentes;
+- declarar dependências, hipóteses e incertezas, em vez de preencher lacunas com suposições;
+- não trocar a recomendação entre respostas sem explicar qual evidência nova mudou a prioridade.
+
 ## Limites
 
 O framework orienta decisões de produto; não substitui os contratos de domínio, as regras financeiras, os requisitos de segurança, privacidade e acessibilidade, nem a arquitetura definida nos ADRs. Nenhum ganho de conversão justifica violar esses limites.

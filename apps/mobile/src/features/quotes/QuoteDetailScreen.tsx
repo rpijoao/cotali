@@ -9,7 +9,11 @@ import {
   Text,
   View,
 } from 'react-native';
-import { getQuoteDetails } from './quote-api';
+import {
+  getQuoteDetails,
+  shareQuoteProposal,
+  shareQuoteProposalToWhatsApp,
+} from './quote-api';
 import { formatBrl } from './money';
 
 export function QuoteDetailScreen({
@@ -22,6 +26,10 @@ export function QuoteDetailScreen({
   const [quote, setQuote] = useState<QuoteDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [sharingPdf, setSharingPdf] = useState(false);
+  const [pdfError, setPdfError] = useState<string | null>(null);
+  const [sharingWhatsApp, setSharingWhatsApp] = useState(false);
+  const [whatsAppError, setWhatsAppError] = useState<string | null>(null);
 
   const loadQuote = useCallback(async () => {
     setLoading(true);
@@ -36,6 +44,43 @@ export function QuoteDetailScreen({
       );
     } finally {
       setLoading(false);
+    }
+  }, [quoteId]);
+
+  const handleShareToWhatsApp = useCallback(async () => {
+    if (!quote) return;
+    setSharingWhatsApp(true);
+    setWhatsAppError(null);
+    try {
+      await shareQuoteProposalToWhatsApp({
+        clientName: quote.client.name,
+        clientPhone: quote.client.phone,
+        quoteId,
+      });
+    } catch (cause) {
+      setWhatsAppError(
+        cause instanceof Error
+          ? cause.message
+          : 'Não foi possível preparar o envio pelo WhatsApp.',
+      );
+    } finally {
+      setSharingWhatsApp(false);
+    }
+  }, [quote, quoteId]);
+
+  const handleSharePdf = useCallback(async () => {
+    setSharingPdf(true);
+    setPdfError(null);
+    try {
+      await shareQuoteProposal(quoteId);
+    } catch (cause) {
+      setPdfError(
+        cause instanceof Error
+          ? cause.message
+          : 'Não foi possível gerar o PDF do orçamento.',
+      );
+    } finally {
+      setSharingPdf(false);
     }
   }, [quoteId]);
 
@@ -94,6 +139,59 @@ export function QuoteDetailScreen({
           Criado em {formatDate(quote.createdAt)} · revisão{' '}
           {quote.revisionNumber}
         </Text>
+      </View>
+
+      <View style={styles.whatsAppCard}>
+        <View style={styles.pdfCopy}>
+          <Text style={styles.pdfTitle}>Enviar pelo WhatsApp</Text>
+          <Text style={styles.pdfDescription}>
+            Gere o PDF e prepare uma mensagem para o WhatsApp com os dados deste
+            cliente.
+          </Text>
+        </View>
+        <Pressable
+          accessibilityRole="button"
+          disabled={sharingWhatsApp}
+          onPress={() => void handleShareToWhatsApp()}
+          style={[
+            styles.pdfButton,
+            sharingWhatsApp && styles.pdfButtonDisabled,
+          ]}
+        >
+          {sharingWhatsApp ? (
+            <ActivityIndicator color="#FFFFFF" />
+          ) : (
+            <Text style={styles.pdfButtonText}>Enviar pelo WhatsApp</Text>
+          )}
+        </Pressable>
+        {whatsAppError && <Text style={styles.pdfError}>{whatsAppError}</Text>}
+      </View>
+
+      <View style={styles.pdfCard}>
+        <View style={styles.pdfCopy}>
+          <Text style={styles.pdfTitle}>Exportar PDF</Text>
+          <Text style={styles.pdfDescription}>
+            Escolha outro aplicativo para compartilhar ou salve o arquivo no
+            aparelho.
+          </Text>
+        </View>
+        <Pressable
+          accessibilityRole="button"
+          disabled={sharingPdf}
+          onPress={() => void handleSharePdf()}
+          style={[
+            styles.pdfButton,
+            styles.exportButton,
+            sharingPdf && styles.pdfButtonDisabled,
+          ]}
+        >
+          {sharingPdf ? (
+            <ActivityIndicator color="#1846E1" />
+          ) : (
+            <Text style={styles.exportButtonText}>Exportar PDF</Text>
+          )}
+        </Pressable>
+        {pdfError && <Text style={styles.pdfError}>{pdfError}</Text>}
       </View>
 
       <LineSection lines={quote.services} title="Serviços" />
@@ -236,6 +334,7 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     padding: 24,
     paddingBottom: 48,
+    paddingTop: 48,
   },
   centered: {
     alignItems: 'center',
@@ -300,6 +399,53 @@ const styles = StyleSheet.create({
     marginTop: 5,
   },
   totalMeta: { color: '#E9EEFF', fontSize: 13, marginTop: 8 },
+  pdfCard: {
+    backgroundColor: '#FFFFFF',
+    borderColor: '#C9D7FF',
+    borderRadius: 18,
+    borderWidth: 1,
+    marginTop: 14,
+    padding: 18,
+  },
+  whatsAppCard: {
+    backgroundColor: '#EAF0FF',
+    borderColor: '#1846E1',
+    borderRadius: 18,
+    borderWidth: 1,
+    marginTop: 14,
+    padding: 18,
+  },
+  pdfCopy: { marginBottom: 14 },
+  pdfTitle: { color: '#293D35', fontSize: 16, fontWeight: '800' },
+  pdfDescription: {
+    color: '#6F7E76',
+    fontSize: 13,
+    lineHeight: 19,
+    marginTop: 5,
+  },
+  pdfButton: {
+    alignItems: 'center',
+    backgroundColor: '#1846E1',
+    borderRadius: 12,
+    minHeight: 48,
+    justifyContent: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  exportButton: {
+    backgroundColor: '#FFFFFF',
+    borderColor: '#1846E1',
+    borderWidth: 1,
+  },
+  pdfButtonDisabled: { opacity: 0.65 },
+  pdfButtonText: { color: '#FFFFFF', fontSize: 14, fontWeight: '800' },
+  exportButtonText: { color: '#1846E1', fontSize: 14, fontWeight: '800' },
+  pdfError: {
+    color: '#B33D35',
+    fontSize: 13,
+    lineHeight: 18,
+    marginTop: 10,
+  },
   card: {
     backgroundColor: '#FFFFFF',
     borderColor: '#E0E8E2',

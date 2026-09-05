@@ -6,7 +6,11 @@
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
     "android": {
-      "package": "br.com.cotali.app"
+      "package": "br.com.cotali.app",
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS"
+      ]
     },
     "plugins": [
       [
@@ -19,10 +23,30 @@
         }
       ],
       "expo-asset",
-      "expo-sqlite"
+      "expo-sqlite",
+      "expo-sharing",
+      [
+        "react-native-share",
+        {
+          "android": ["com.whatsapp"]
+        }
+      ]
     ],
     "runtimeVersion": {
       "policy": "appVersion"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "97533d5c-c68f-4f2a-8761-3eab9bbb4948"
+      }
+    },
+    "owner": "joaofurtado",
+    "ios": {
+      "bundleIdentifier": "br.com.cotali.app",
+      "infoPlist": {
+        "LSApplicationQueriesSchemes": ["whatsapp"],
+        "ITSAppUsesNonExemptEncryption": false
+      }
     }
   }
 }

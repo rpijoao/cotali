@@ -114,6 +114,27 @@ export type QuoteLineEditResult = Readonly<{
   services: readonly QuoteLineInput[];
 }>;
 
+export type QuoteClientNameEditCommand = Readonly<{
+  name: string;
+}>;
+
+/**
+ * Applies the supported voice edit for the client name. The LLM proposes the
+ * value, but the domain owns the final validation and normalization.
+ */
+export function applyQuoteClientNameEdit(
+  command: QuoteClientNameEditCommand,
+): string {
+  const name = command.name.trim();
+  if (name === '' || name.length > 160) {
+    throw new QuoteDomainError(
+      'QUOTE_EDIT_INVALID_VALUE',
+      'O nome do cliente deve ter entre 1 e 160 caracteres.',
+    );
+  }
+  return name;
+}
+
 /**
  * Applies one normalized voice edit immutably. The LLM only proposes the
  * command; this function is the authority that checks its target and values.

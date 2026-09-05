@@ -1,4 +1,7 @@
-import { VoiceInterpretationSchema } from '@cotali/contracts';
+import {
+  VoiceInterpretationSchema,
+  VoiceQuoteEditInterpretationSchema,
+} from '@cotali/contracts';
 import { Value } from '@sinclair/typebox/value';
 import { describe, expect, it } from 'vitest';
 import './index';
@@ -34,5 +37,31 @@ describe('voice interpretation validation', () => {
     };
 
     expect(Value.Check(VoiceInterpretationSchema, interpretation)).toBe(true);
+  });
+
+  it('accepts a client name edit command', () => {
+    const interpretation = {
+      id: '73070f7c-a464-47d7-90bf-b06ac2ce7a1e',
+      transcript: 'Altere o nome do cliente para Roberto Pedro Pereira.',
+      command: {
+        ambiguities: [],
+        changes: {
+          clientName: 'Roberto Pedro Pereira',
+          description: null,
+          quantity: null,
+          unit: null,
+          unitPriceInCents: null,
+        },
+        index: null,
+        intent: 'update_client' as const,
+        section: 'client' as const,
+      },
+      source: 'command' as const,
+      createdAt: '2026-09-03T23:00:00.000Z',
+    };
+
+    expect(
+      Value.Check(VoiceQuoteEditInterpretationSchema, interpretation),
+    ).toBe(true);
   });
 });

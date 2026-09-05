@@ -102,6 +102,60 @@ export const PaymentStatusSchema = Type.Union([
   Type.Literal('paid'),
 ]);
 
+const ProfileOptionalText = Type.Union([
+  Type.String({ minLength: 1, maxLength: 240 }),
+  Type.Null(),
+]);
+
+export const ProfessionalProfileSchema = Type.Object(
+  {
+    address: ProfileOptionalText,
+    businessName: Type.Union([
+      Type.String({ minLength: 1, maxLength: 120 }),
+      Type.Null(),
+    ]),
+    document: Type.Union([
+      Type.String({ minLength: 1, maxLength: 20 }),
+      Type.Null(),
+    ]),
+    name: Type.String({ maxLength: 120 }),
+    phone: Type.Union([
+      Type.String({
+        minLength: 11,
+        maxLength: 20,
+        pattern: '^\\+[1-9]\\d{9,19}$',
+      }),
+      Type.Null(),
+    ]),
+    updatedAt: Type.Union([Type.String({ format: 'date-time' }), Type.Null()]),
+  },
+  { additionalProperties: false },
+);
+
+export const UpdateProfessionalProfileSchema = Type.Object(
+  {
+    address: ProfileOptionalText,
+    businessName: Type.Union([
+      Type.String({ minLength: 1, maxLength: 120 }),
+      Type.Null(),
+    ]),
+    document: Type.Union([
+      Type.String({ minLength: 1, maxLength: 20 }),
+      Type.Null(),
+    ]),
+    name: Type.String({ minLength: 1, maxLength: 120 }),
+    phone: Type.Union([
+      Type.String({
+        minLength: 11,
+        maxLength: 20,
+        pattern: '^\\+[1-9]\\d{9,19}$',
+      }),
+      Type.Null(),
+    ]),
+  },
+  { additionalProperties: false },
+);
+
 export const QuoteSummarySchema = Type.Object(
   {
     id: Type.String({ format: 'uuid' }),
@@ -261,6 +315,10 @@ export const VoiceInterpretationJobSchema = Type.Object(
 
 const VoiceQuoteEditChangesSchema = Type.Object(
   {
+    clientName: Type.Union([
+      Type.String({ minLength: 1, maxLength: 160 }),
+      Type.Null(),
+    ]),
     description: Type.Union([
       Type.String({ minLength: 1, maxLength: 160 }),
       Type.Null(),
@@ -283,6 +341,18 @@ const VoiceQuoteEditChangesSchema = Type.Object(
 
 export const VoiceQuoteEditContextSchema = Type.Object(
   {
+    // Optional to keep older mobile clients compatible with the command
+    // endpoint. New clients send this context so the model can target the
+    // customer's name explicitly.
+    client: Type.Optional(
+      Type.Object(
+        {
+          name: Type.String({ maxLength: 160 }),
+          phone: Type.String({ maxLength: 32 }),
+        },
+        { additionalProperties: false },
+      ),
+    ),
     services: Type.Array(
       Type.Object(
         {
@@ -318,14 +388,19 @@ export const VoiceQuoteEditContextSchema = Type.Object(
 );
 
 /**
- * A normalized, zero-based edit against one existing quote line. When the
- * request is ambiguous, intent is no_op and target fields are null. Null
+ * A normalized edit against one existing quote line or the client name. When
+ * the request is ambiguous, intent is no_op and target fields are null. Null
  * fields inside changes mean "keep the current value".
  */
 export const VoiceQuoteEditCommandSchema = Type.Object(
   {
-    intent: Type.Union([Type.Literal('update_line'), Type.Literal('no_op')]),
+    intent: Type.Union([
+      Type.Literal('update_client'),
+      Type.Literal('update_line'),
+      Type.Literal('no_op'),
+    ]),
     section: Type.Union([
+      Type.Literal('client'),
       Type.Literal('services'),
       Type.Literal('materials'),
       Type.Null(),
@@ -359,6 +434,10 @@ export const ApiErrorSchema = Type.Object({
 
 export type CreateQuoteDraft = Static<typeof CreateQuoteDraftSchema>;
 export type PaymentPlanType = Static<typeof PaymentPlanTypeSchema>;
+export type ProfessionalProfile = Static<typeof ProfessionalProfileSchema>;
+export type UpdateProfessionalProfile = Static<
+  typeof UpdateProfessionalProfileSchema
+>;
 export type QuoteDraft = Static<typeof QuoteDraftSchema>;
 export type QuoteLineInput = Static<typeof QuoteLineInputSchema>;
 export type QuoteStatus = Static<typeof QuoteStatusSchema>;

@@ -48,6 +48,21 @@ A API responde em `http://localhost:3333/v1/health` e publica a documentação e
 
 No emulador Android, o app usa `http://10.0.2.2:3333` como API. Para um aparelho físico, copie `apps/mobile/.env.example` para `apps/mobile/.env` e troque o endereço pelo IP local do computador.
 
+Para testar um aparelho físico fora da rede de casa usando Tailscale, conecte o
+PC e o iPhone à mesma tailnet, descubra o IP do PC e anuncie esse host ao Expo:
+
+```powershell
+tailscale ip -4
+$env:REACT_NATIVE_PACKAGER_HOSTNAME = "<ip-tailscale-do-pc>"
+corepack pnpm --filter @cotali/mobile exec expo start --lan
+```
+
+Em `apps/mobile/.env`, use o mesmo IP para a API:
+`EXPO_PUBLIC_API_URL=http://<ip-tailscale-do-pc>:3333`. No Expo Go, abra a URL
+`exp://<ip-tailscale-do-pc>:8081` (ou escaneie o QR exibido pelo Expo). O PC
+precisa permanecer com a API e o Metro em execução, e o Firewall do Windows
+deve permitir as portas TCP 3333 e 8081 no adaptador Tailscale.
+
 ## Corte vertical atual
 
 Ao abrir o app, a tela inicial mostra o rascunho local e os orçamentos recentes
@@ -70,6 +85,27 @@ No fluxo de criação, o app Android já permite preencher e revisar manualmente
 alimentar a tela inicial, sem expor o áudio ou outros dados de processamento.
 `GET /v1/quotes/:id` retorna a revisão atual completa de um orçamento da mesma
 conta para a tela de detalhes.
+`GET /v1/quotes/:id/proposal.pdf` gera a proposta em PDF no backend a partir
+da revisão corrente validada, incluindo o perfil profissional sincronizado
+quando disponível. O endpoint responde `404` se a cotação não pertencer à conta
+autenticada.
+Na tela de detalhes, **Enviar pelo WhatsApp** baixa esse arquivo para o
+diretório de documentos do app e inicia o compartilhamento nativo. No Android,
+o WhatsApp é direcionado para o número normalizado do cliente e recebe o PDF
+com uma mensagem pré-preenchida. No iPhone, a folha nativa mostra o PDF e a
+mensagem para o usuário escolher o WhatsApp; o app não afirma que a mensagem
+foi entregue. **Exportar PDF** continua disponível para escolher outro app ou
+salvar o arquivo.
+
+O fluxo de WhatsApp usa `react-native-share`, um módulo nativo. Depois de
+adicioná-lo, o Expo Go não contém esse módulo: é necessário gerar um novo
+development build para testar no Android ou iPhone. A exportação genérica
+continua usando `expo-sharing`.
+
+`GET /v1/profile` e `PATCH /v1/profile` mantêm os dados profissionais da conta
+(nome profissional, nome comercial, telefone, documento e endereço). O Android
+mantém uma cópia local para leitura quando estiver sem conexão, mas a versão
+sincronizada na API/PostgreSQL é a fonte oficial para documentos futuros.
 
 Em desenvolvimento, use `Authorization: Bearer dev:local-user`. Esse modo é recusado quando `NODE_ENV=production`. Em produção, a API exige `OIDC_ISSUER`, `OIDC_AUDIENCE` e `OIDC_JWKS_URL` para validar JWTs assinados pelo provedor escolhido.
 
@@ -80,15 +116,16 @@ O teste do adaptador PostgreSQL real é habilitado explicitamente com `RUN_DATAB
 O fluxo de voz usa `POST /v1/voice/interpretations` com multipart contendo `mutationId` (UUID) e `audio` (até 25 MB). A API autentica, grava um `VoiceJob` na branch Neon e responde `202` com o status `pending`. O worker (`pnpm dev:worker`) reclama jobs com lease, transcreve/interpreta no Groq, persiste o resultado e remove o áudio binário ao concluir. O app consulta `GET /v1/voice/interpretations/:mutationId` até receber `completed` ou `failed`. Retries usam a mesma chave e não duplicam o job.
 
 Na segunda etapa, a tela de dados oferece **Ajuste por voz**. O app envia o áudio,
-`mutationId` e o contexto atual das linhas para `POST /v1/voice/commands`. A rota
-usa os mesmos modelos configurados no Groq, retorna uma única operação normalizada
-(por exemplo, `services[0].quantity = "3"`) ou `no_op` quando o pedido é ambíguo.
-O app mostra a transcrição e a alteração proposta; somente o botão **Aplicar
-alteração** chama a regra de domínio, que valida índice, quantidade, preço e limites
-antes de atualizar o rascunho. Essa rota é síncrona e não persiste áudio ou comando
-no MVP; a fila durável continua sendo usada para a interpretação inicial. Após
-aplicar, o app oferece **Desfazer última alteração** até que uma edição manual ou
-um novo áudio substitua esse histórico curto.
+`mutationId` e o contexto atual do cliente e das linhas para
+`POST /v1/voice/commands`. A rota usa os mesmos modelos configurados no Groq e
+retorna uma única operação normalizada, como `services[0].quantity = "3"` ou
+`client.name = "Roberto Pedro Pereira"`, e usa `no_op` quando o pedido é ambíguo
+ou ainda não é suportado. O app mostra a transcrição e a alteração proposta;
+somente o botão **Aplicar alteração** chama a regra de domínio, que valida o
+alvo e os valores antes de atualizar o rascunho. Essa rota é síncrona e não
+persiste áudio ou comando no MVP; a fila durável continua sendo usada para a
+interpretação inicial. Após aplicar, o app oferece **Desfazer última alteração**
+até que uma edição manual ou um novo áudio substitua esse histórico curto.
 
 ### Benchmark local de voz
 
