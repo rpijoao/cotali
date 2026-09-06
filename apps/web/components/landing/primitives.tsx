@@ -4,7 +4,11 @@ type IconProps = {
 
 export function ArrowUpRight({ className = '' }: IconProps) {
   return (
-    <svg aria-hidden="true" className={`size-[18px] fill-none stroke-current stroke-[1.5] stroke-linecap-round stroke-linejoin-round transition-transform duration-200 group-hover:translate-x-1 group-hover:-translate-y-1 ${className}`} viewBox="0 0 16 16">
+    <svg
+      aria-hidden="true"
+      className={`size-[18px] fill-none stroke-current stroke-[1.5] stroke-linecap-round stroke-linejoin-round transition-transform duration-200 group-hover:translate-x-1 group-hover:-translate-y-1 ${className}`}
+      viewBox="0 0 16 16"
+    >
       <path d="M3 13 13 3M5 3h8v8" />
     </svg>
   );
@@ -12,7 +16,11 @@ export function ArrowUpRight({ className = '' }: IconProps) {
 
 export function AudioIcon() {
   return (
-    <svg aria-hidden="true" className="size-[18px] fill-current stroke-none" viewBox="0 0 20 20">
+    <svg
+      aria-hidden="true"
+      className="size-[18px] fill-current stroke-none"
+      viewBox="0 0 20 20"
+    >
       <rect height="8" rx="2" width="4" x="2" y="6" />
       <rect height="14" rx="2" width="4" x="8" y="3" />
       <rect height="10" rx="2" width="4" x="14" y="5" />
@@ -22,7 +30,11 @@ export function AudioIcon() {
 
 export function CheckIcon() {
   return (
-    <svg aria-hidden="true" className="size-[15px] fill-none stroke-current stroke-[1.5] stroke-linecap-round stroke-linejoin-round" viewBox="0 0 16 16">
+    <svg
+      aria-hidden="true"
+      className="size-[15px] fill-none stroke-current stroke-[1.5] stroke-linecap-round stroke-linejoin-round"
+      viewBox="0 0 16 16"
+    >
       <path d="m3 8 3 3 7-7" />
     </svg>
   );
@@ -36,7 +48,9 @@ export function Logo() {
         <i className="block h-[15px] w-[5px] origin-bottom skew-x-[-18deg] rounded-t-full bg-current" />
         <i className="block h-5 w-[5px] origin-bottom skew-x-[-18deg] rounded-t-full bg-current" />
       </span>
-      <span>cotali<span aria-hidden="true">.</span></span>
+      <span>
+        cotali<span aria-hidden="true">.</span>
+      </span>
     </span>
   );
 }

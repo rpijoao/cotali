@@ -75,5 +75,57 @@ run('PrismaQuoteRepository', () => {
         where: { account: { authSubject: subject }, mutationId },
       }),
     ).toBe(1);
+
+    const details = await new PrismaQuoteRepository(prisma).getById(
+      subject,
+      first.id,
+    );
+    expect(details).toMatchObject({
+      client: input.client,
+      id: first.id,
+      paymentStatus: 'pending',
+      services: input.services,
+      source: 'manual',
+      status: 'draft',
+    });
+
+    const updated = await service.updateDraft(subject, first.id, {
+      ...input,
+      client: { name: 'Cliente de integração atualizado', phone: null },
+      mutationId: randomUUID(),
+      services: [
+        {
+          description: 'Instalação revisada',
+          quantity: '2',
+          unit: 'un',
+          unitPriceInCents: 15000,
+        },
+      ],
+    });
+    const storedUpdated = await prisma.quote.findUnique({
+      include: {
+        currentRevision: { include: { materials: true, services: true } },
+      },
+      where: { id: first.id },
+    });
+
+    expect(updated).toMatchObject({
+      client: { name: 'Cliente de integração atualizado', phone: null },
+      revisionNumber: 2,
+      services: [
+        {
+          description: 'Instalação revisada',
+          quantity: '2',
+          unit: 'un',
+          unitPriceInCents: 15000,
+        },
+      ],
+      totals: {
+        servicesInCents: 30000,
+        totalInCents: 30000,
+      },
+    });
+    expect(storedUpdated?.currentRevision?.revisionNumber).toBe(2);
+    expect(storedUpdated?.totalCents).toBe(30000n);
   }, 20_000);
 });

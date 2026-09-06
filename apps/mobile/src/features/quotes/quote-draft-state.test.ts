@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { parseLocalQuoteDraft } from './quote-draft-state';
+import {
+  hasLocalQuoteDraftContent,
+  parseLocalQuoteDraft,
+  type LocalQuoteDraft,
+} from './quote-draft-state';
 
 const validDraft = {
   clientName: 'Maria',
@@ -21,8 +25,15 @@ const validDraft = {
       unitPrice: '10000',
     },
   ],
+  validUntil: '2026-09-30',
   version: 1,
-} as const;
+} satisfies LocalQuoteDraft;
+
+function withoutValidity(draft: LocalQuoteDraft): LocalQuoteDraft {
+  const copy = { ...draft };
+  delete copy.validUntil;
+  return copy;
+}
 
 describe('parseLocalQuoteDraft', () => {
   it('restores a valid versioned draft', () => {
@@ -38,5 +49,58 @@ describe('parseLocalQuoteDraft', () => {
     JSON.stringify({ ...validDraft, services: [{ description: 12 }] }),
   ])('rejects malformed or unsupported persisted data', (value) => {
     expect(parseLocalQuoteDraft(value)).toBeNull();
+  });
+});
+
+describe('hasLocalQuoteDraftContent', () => {
+  it('detects a draft worth resuming', () => {
+    expect(hasLocalQuoteDraftContent(validDraft)).toBe(true);
+  });
+
+  it('does not surface the untouched initial form', () => {
+    expect(
+      hasLocalQuoteDraftContent({
+        ...withoutValidity(validDraft),
+        clientName: '',
+        clientPhone: '',
+        discount: '',
+        executionDeadline: '',
+        materials: [],
+        notes: '',
+        paymentMethod: 'Pix',
+        services: [
+          {
+            description: '',
+            quantity: '1',
+            unit: 'un',
+            unitPrice: '',
+          },
+        ],
+      }),
+    ).toBe(false);
+  });
+
+  it('surfaces a draft whose only meaningful field is validity', () => {
+    expect(
+      hasLocalQuoteDraftContent({
+        ...validDraft,
+        clientName: '',
+        clientPhone: '',
+        discount: '',
+        executionDeadline: '',
+        materials: [],
+        notes: '',
+        paymentMethod: 'Pix',
+        services: [
+          {
+            description: '',
+            quantity: '1',
+            unit: 'un',
+            unitPrice: '',
+          },
+        ],
+        validUntil: '2026-09-30',
+      }),
+    ).toBe(true);
   });
 });

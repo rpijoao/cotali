@@ -72,4 +72,3 @@ Use este template antes de implementar uma mudança que altere a experiência, a
 - **Por que esta opção:**
 - **O que faria mudar de ideia:**
 - **Aprendizado após lançamento:**
-

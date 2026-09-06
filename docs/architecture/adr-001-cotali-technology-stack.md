@@ -42,7 +42,7 @@ packages/
 - `expo-audio` para captura de voz.
 - Development builds durante o desenvolvimento; EAS Build para artefatos Android e EAS Update apenas para mudanças compatíveis com a versão nativa instalada.
 - SQLite no dispositivo para rascunhos, cache e outbox local-first.
-- Compartilhamento nativo para PDF e integração progressiva com WhatsApp.
+- `react-native-share` para iniciar o envio direcionado de propostas PDF pelo WhatsApp no Android, com `expo-sharing` como fallback genérico. O módulo exige development build; o Expo Go não é suficiente para esse fluxo.
 
 ### Web e landing page
 
@@ -88,6 +88,17 @@ packages/
 - PDFs e áudios ficarão em object storage compatível com S3, com metadados e checksums no PostgreSQL.
 - O mecanismo concreto de renderização de PDF será validado no spike vertical antes de ser congelado.
 
+### Compartilhamento da proposta
+
+- A ação principal do mobile baixa o PDF autenticado e inicia o adaptador nativo
+  com mensagem pré-preenchida.
+- No Android, o adaptador usa o telefone internacional normalizado para abrir o
+  WhatsApp e anexar o PDF. O resultado representa compartilhamento iniciado, não
+  entrega confirmada.
+- No iOS, a mesma ação abre a folha nativa com o PDF e a mensagem para o usuário
+  escolher o WhatsApp; o direcionamento automático com anexo PDF permanece uma
+  limitação a validar em um development build.
+
 ### Autenticação e segurança
 
 - OpenID Connect/OAuth 2.1 por meio de um provedor gerenciado.
@@ -124,7 +135,8 @@ Estas escolhas não bloqueiam o scaffold e não alteram a arquitetura:
 - provedor de autenticação;
 - provedor de transcrição/extração estruturada;
 - biblioteca ou engine final de renderização de PDF;
-- método avançado de envio direto de anexo para conversa específica no WhatsApp;
+- compatibilidade final do anexo PDF direcionado no WhatsApp em cada versão de
+  Android/iOS e a futura integração com WhatsApp Business API;
 - iOS e requisitos específicos da App Store.
 
 ## Alternativas rejeitadas para o MVP

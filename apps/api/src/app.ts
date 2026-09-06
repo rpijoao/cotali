@@ -6,19 +6,29 @@ import swaggerUi from '@fastify/swagger-ui';
 import Fastify from 'fastify';
 import type { VoiceJobRepository } from '@cotali/database';
 import type { Authenticator } from './auth/authenticator.js';
+import { registerProfileRoutes } from './profile/profile-routes.js';
+import {
+  MemoryProfileRepository,
+  ProfileService,
+} from './profile/profile-service.js';
 import { registerQuoteRoutes } from './quotes/quote-routes.js';
 import type { QuoteService } from './quotes/quote-service.js';
 import { registerVoiceRoutes } from './voice/voice-routes.js';
-import type { VoiceInterpreter } from './voice/groq-voice-interpreter.js';
+import type {
+  VoiceCommandInterpreter,
+  VoiceInterpreter,
+} from './voice/groq-voice-interpreter.js';
 import { MAX_AUDIO_BYTES } from './voice/voice-routes.js';
 
 export async function buildApp(options: {
   authenticator: Authenticator;
   docsEnabled?: boolean;
   logger?: boolean;
+  profileService?: ProfileService;
   quoteService: QuoteService;
   rateLimitMax?: number;
   voiceInterpreter?: VoiceInterpreter | undefined;
+  voiceCommandInterpreter?: VoiceCommandInterpreter | undefined;
   voiceJobRepository?: VoiceJobRepository | undefined;
 }) {
   const app = Fastify({
@@ -58,12 +68,21 @@ export async function buildApp(options: {
     });
     await app.register(swaggerUi, { routePrefix: '/docs' });
   }
-  await registerQuoteRoutes(app, options.authenticator, options.quoteService);
+  const profileService =
+    options.profileService ?? new ProfileService(new MemoryProfileRepository());
+  await registerQuoteRoutes(
+    app,
+    options.authenticator,
+    options.quoteService,
+    profileService,
+  );
+  await registerProfileRoutes(app, options.authenticator, profileService);
   await registerVoiceRoutes(
     app,
     options.authenticator,
     options.voiceInterpreter,
     options.voiceJobRepository,
+    options.voiceCommandInterpreter,
   );
 
   app.get(

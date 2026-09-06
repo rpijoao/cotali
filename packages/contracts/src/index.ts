@@ -11,7 +11,7 @@ export const QuoteLineInputSchema = Type.Object(
     description: Type.String({ minLength: 1, maxLength: 160 }),
     quantity: Type.String({
       pattern:
-        '^(?:0\\.(?:00[1-9]|0[1-9]\\d|[1-9]\\d{0,2})|[1-9]\\d*(?:\\.\\d{1,3})?)$',
+        '^(?:0\\.(?:00[1-9]|0[1-9]\\d?|[1-9]\\d{0,2})|[1-9]\\d*(?:\\.\\d{1,3})?)$',
     }),
     unit: Type.Union([
       Type.String({ minLength: 1, maxLength: 20 }),
@@ -71,6 +71,12 @@ export const CreateQuoteDraftSchema = Type.Object(
   { additionalProperties: false },
 );
 
+// Editing a saved quote creates a new immutable revision. The payload has the
+// same shape as a new draft, including a mutation id for idempotent retries.
+export const UpdateQuoteRevisionSchema = Type.Composite([
+  CreateQuoteDraftSchema,
+]);
+
 export const QuoteTotalsSchema = Type.Object({
   discountInCents: Type.Integer({ minimum: 0 }),
   materialsInCents: Type.Integer({ minimum: 0 }),
@@ -89,6 +95,148 @@ export const QuoteDraftSchema = Type.Intersect([
     createdAt: Type.String({ format: 'date-time' }),
   }),
 ]);
+
+export const QuoteStatusSchema = Type.Union([
+  Type.Literal('draft'),
+  Type.Literal('ready_to_share'),
+  Type.Literal('shared'),
+]);
+
+export const PaymentStatusSchema = Type.Union([
+  Type.Literal('pending'),
+  Type.Literal('partially_paid'),
+  Type.Literal('paid'),
+]);
+
+const ProfileOptionalText = Type.Union([
+  Type.String({ minLength: 1, maxLength: 240 }),
+  Type.Null(),
+]);
+
+export const ProfessionalProfileSchema = Type.Object(
+  {
+    address: ProfileOptionalText,
+    businessName: Type.Union([
+      Type.String({ minLength: 1, maxLength: 120 }),
+      Type.Null(),
+    ]),
+    document: Type.Union([
+      Type.String({ minLength: 1, maxLength: 20 }),
+      Type.Null(),
+    ]),
+    name: Type.String({ maxLength: 120 }),
+    phone: Type.Union([
+      Type.String({
+        minLength: 11,
+        maxLength: 20,
+        pattern: '^\\+[1-9]\\d{9,19}$',
+      }),
+      Type.Null(),
+    ]),
+    updatedAt: Type.Union([Type.String({ format: 'date-time' }), Type.Null()]),
+  },
+  { additionalProperties: false },
+);
+
+export const UpdateProfessionalProfileSchema = Type.Object(
+  {
+    address: ProfileOptionalText,
+    businessName: Type.Union([
+      Type.String({ minLength: 1, maxLength: 120 }),
+      Type.Null(),
+    ]),
+    document: Type.Union([
+      Type.String({ minLength: 1, maxLength: 20 }),
+      Type.Null(),
+    ]),
+    name: Type.String({ minLength: 1, maxLength: 120 }),
+    phone: Type.Union([
+      Type.String({
+        minLength: 11,
+        maxLength: 20,
+        pattern: '^\\+[1-9]\\d{9,19}$',
+      }),
+      Type.Null(),
+    ]),
+  },
+  { additionalProperties: false },
+);
+
+export const QuoteSummarySchema = Type.Object(
+  {
+    id: Type.String({ format: 'uuid' }),
+    client: Type.Object(
+      {
+        name: Type.String({ minLength: 1, maxLength: 120 }),
+        phone: Type.Union([
+          Type.String({ minLength: 11, maxLength: 20 }),
+          Type.Null(),
+        ]),
+      },
+      { additionalProperties: false },
+    ),
+    totalInCents: Type.Integer({ minimum: 0 }),
+    status: QuoteStatusSchema,
+    paymentStatus: PaymentStatusSchema,
+    revisionNumber: Type.Integer({ minimum: 1 }),
+    createdAt: Type.String({ format: 'date-time' }),
+  },
+  { additionalProperties: false },
+);
+
+export const QuoteSummaryListSchema = Type.Array(QuoteSummarySchema, {
+  maxItems: 50,
+});
+
+export const QuoteDetailsSchema = Type.Object(
+  {
+    id: Type.String({ format: 'uuid' }),
+    client: Type.Object(
+      {
+        name: Type.String({ minLength: 1, maxLength: 120 }),
+        phone: Type.Union([
+          Type.String({ minLength: 11, maxLength: 20 }),
+          Type.Null(),
+        ]),
+      },
+      { additionalProperties: false },
+    ),
+    services: Type.Array(QuoteLineInputSchema, { minItems: 1, maxItems: 5 }),
+    materials: Type.Array(QuoteLineInputSchema, { maxItems: 10 }),
+    conditions: Type.Object(
+      {
+        paymentMethod: Type.Union([
+          Type.String({ minLength: 1, maxLength: 80 }),
+          Type.Null(),
+        ]),
+        paymentPlanType: PaymentPlanTypeSchema,
+        installmentCount: Type.Union([
+          Type.Integer({ minimum: 2, maximum: 24 }),
+          Type.Null(),
+        ]),
+        executionDeadline: Type.Union([
+          Type.String({ minLength: 1, maxLength: 120 }),
+          Type.Null(),
+        ]),
+        validUntil: Type.Union([Type.String({ format: 'date' }), Type.Null()]),
+        notes: Type.Union([Type.String({ maxLength: 1000 }), Type.Null()]),
+      },
+      { additionalProperties: false },
+    ),
+    discountInCents: Type.Integer({ minimum: 0 }),
+    source: Type.Union([
+      Type.Literal('manual'),
+      Type.Literal('interpretation'),
+      Type.Literal('mixed'),
+    ]),
+    revisionNumber: Type.Integer({ minimum: 1 }),
+    status: QuoteStatusSchema,
+    paymentStatus: PaymentStatusSchema,
+    totals: QuoteTotalsSchema,
+    createdAt: Type.String({ format: 'date-time' }),
+  },
+  { additionalProperties: false },
+);
 
 const NullableString = Type.Union([Type.String(), Type.Null()]);
 
@@ -171,6 +319,118 @@ export const VoiceInterpretationJobSchema = Type.Object(
   { additionalProperties: false },
 );
 
+const VoiceQuoteEditChangesSchema = Type.Object(
+  {
+    clientName: Type.Union([
+      Type.String({ minLength: 1, maxLength: 160 }),
+      Type.Null(),
+    ]),
+    description: Type.Union([
+      Type.String({ minLength: 1, maxLength: 160 }),
+      Type.Null(),
+    ]),
+    quantity: Type.Union([
+      Type.String({
+        pattern:
+          '^(?:0\\.(?:00[1-9]|0[1-9]\\d?|[1-9]\\d{0,2})|[1-9]\\d*(?:\\.\\d{1,3})?)$',
+      }),
+      Type.Null(),
+    ]),
+    unit: Type.Union([
+      Type.String({ minLength: 1, maxLength: 20 }),
+      Type.Null(),
+    ]),
+    unitPriceInCents: Type.Union([Type.Integer({ minimum: 0 }), Type.Null()]),
+  },
+  { additionalProperties: false },
+);
+
+export const VoiceQuoteEditContextSchema = Type.Object(
+  {
+    // Optional to keep older mobile clients compatible with the command
+    // endpoint. New clients send this context so the model can target the
+    // customer's name explicitly.
+    client: Type.Optional(
+      Type.Object(
+        {
+          name: Type.String({ maxLength: 160 }),
+          phone: Type.String({ maxLength: 32 }),
+        },
+        { additionalProperties: false },
+      ),
+    ),
+    services: Type.Array(
+      Type.Object(
+        {
+          description: Type.String({ maxLength: 160 }),
+          quantity: Type.String({ maxLength: 32 }),
+          unit: Type.String({ maxLength: 20 }),
+          unitPriceInCents: Type.Union([
+            Type.Integer({ minimum: 0 }),
+            Type.Null(),
+          ]),
+        },
+        { additionalProperties: false },
+      ),
+      { maxItems: 5 },
+    ),
+    materials: Type.Array(
+      Type.Object(
+        {
+          description: Type.String({ maxLength: 160 }),
+          quantity: Type.String({ maxLength: 32 }),
+          unit: Type.String({ maxLength: 20 }),
+          unitPriceInCents: Type.Union([
+            Type.Integer({ minimum: 0 }),
+            Type.Null(),
+          ]),
+        },
+        { additionalProperties: false },
+      ),
+      { maxItems: 10 },
+    ),
+  },
+  { additionalProperties: false },
+);
+
+/**
+ * A normalized edit against one existing quote line or the client name. When
+ * the request is ambiguous, intent is no_op and target fields are null. Null
+ * fields inside changes mean "keep the current value".
+ */
+export const VoiceQuoteEditCommandSchema = Type.Object(
+  {
+    intent: Type.Union([
+      Type.Literal('update_client'),
+      Type.Literal('update_line'),
+      Type.Literal('no_op'),
+    ]),
+    section: Type.Union([
+      Type.Literal('client'),
+      Type.Literal('services'),
+      Type.Literal('materials'),
+      Type.Null(),
+    ]),
+    index: Type.Union([Type.Integer({ minimum: 0 }), Type.Null()]),
+    changes: VoiceQuoteEditChangesSchema,
+    ambiguities: Type.Array(Type.String({ minLength: 1, maxLength: 500 }), {
+      maxItems: 32,
+    }),
+  },
+  { additionalProperties: false },
+);
+
+export const VoiceQuoteEditInterpretationSchema = Type.Object(
+  {
+    id: Type.String({ format: 'uuid' }),
+    transcript: Type.String({ minLength: 1, maxLength: 50_000 }),
+    command: VoiceQuoteEditCommandSchema,
+    source: Type.Literal('command'),
+    createdAt: Type.String({ format: 'date-time' }),
+  },
+  { additionalProperties: false },
+);
+
 export const ApiErrorSchema = Type.Object({
   error: Type.Object({
     code: Type.String(),
@@ -179,11 +439,25 @@ export const ApiErrorSchema = Type.Object({
 });
 
 export type CreateQuoteDraft = Static<typeof CreateQuoteDraftSchema>;
+export type UpdateQuoteRevision = Static<typeof UpdateQuoteRevisionSchema>;
 export type PaymentPlanType = Static<typeof PaymentPlanTypeSchema>;
+export type ProfessionalProfile = Static<typeof ProfessionalProfileSchema>;
+export type UpdateProfessionalProfile = Static<
+  typeof UpdateProfessionalProfileSchema
+>;
 export type QuoteDraft = Static<typeof QuoteDraftSchema>;
 export type QuoteLineInput = Static<typeof QuoteLineInputSchema>;
+export type QuoteStatus = Static<typeof QuoteStatusSchema>;
+export type PaymentStatus = Static<typeof PaymentStatusSchema>;
+export type QuoteSummary = Static<typeof QuoteSummarySchema>;
+export type QuoteDetails = Static<typeof QuoteDetailsSchema>;
 export type VoiceInterpretation = Static<typeof VoiceInterpretationSchema>;
 export type VoiceInterpretationJob = Static<
   typeof VoiceInterpretationJobSchema
 >;
 export type VoiceJobStatus = Static<typeof VoiceJobStatusSchema>;
+export type VoiceQuoteEditCommand = Static<typeof VoiceQuoteEditCommandSchema>;
+export type VoiceQuoteEditContext = Static<typeof VoiceQuoteEditContextSchema>;
+export type VoiceQuoteEditInterpretation = Static<
+  typeof VoiceQuoteEditInterpretationSchema
+>;

@@ -1,7 +1,36 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import type { UpdateQuoteRevision } from '@cotali/contracts';
 
-vi.mock('react-native', () => ({ Platform: { OS: 'web' } }));
-vi.mock('expo-file-system', () => ({ File: class File {} }));
+const { nativeShareMock, platformMock, turboModuleRegistryMock } = vi.hoisted(
+  () => ({
+    nativeShareMock: {
+      Social: { WHATSAPP: 'whatsapp' },
+      open: vi.fn(),
+      shareSingle: vi.fn(),
+    },
+    platformMock: { OS: 'web' as string },
+    turboModuleRegistryMock: { get: vi.fn((): object | null => ({})) },
+  }),
+);
+
+vi.mock('react-native', () => ({
+  Platform: platformMock,
+  TurboModuleRegistry: turboModuleRegistryMock,
+}));
+const sharingMock = {
+  isAvailableAsync: vi.fn(),
+  shareAsync: vi.fn(),
+};
+
+vi.mock('expo-file-system', () => ({
+  File: class File {
+    readonly uri = 'file:///documents/cotali-proposal.pdf';
+    write = vi.fn();
+  },
+  Paths: { document: 'file:///documents' },
+}));
+vi.mock('expo-sharing', () => sharingMock);
+vi.mock('react-native-share', () => ({ default: nativeShareMock }));
 
 const fetchMock = vi.fn();
 vi.stubGlobal('fetch', fetchMock);
@@ -10,14 +39,42 @@ let interpretQuoteVoice: (input: {
   mutationId: string;
   uri: string;
 }) => Promise<unknown>;
+let listQuoteSummaries: () => Promise<unknown>;
+let getQuoteDetails: (quoteId: string) => Promise<unknown>;
+let updateQuoteRevision: (
+  quoteId: string,
+  input: UpdateQuoteRevision,
+) => Promise<unknown>;
+let downloadQuoteProposal: (quoteId: string) => Promise<unknown>;
+let shareQuoteProposal: (quoteId: string) => Promise<void>;
+let shareQuoteProposalToWhatsApp: (input: {
+  clientName: string;
+  clientPhone: string | null;
+  quoteId: string;
+}) => Promise<void>;
 
 beforeAll(async () => {
   process.env.EXPO_PUBLIC_API_URL = 'http://localhost:3333';
   process.env.EXPO_PUBLIC_DEV_AUTH_TOKEN = 'dev:local-user';
-  ({ interpretQuoteVoice } = await import('./quote-api'));
+  ({
+    downloadQuoteProposal,
+    getQuoteDetails,
+    interpretQuoteVoice,
+    listQuoteSummaries,
+    shareQuoteProposal,
+    shareQuoteProposalToWhatsApp,
+    updateQuoteRevision,
+  } = await import('./quote-api'));
 });
 
-afterEach(() => fetchMock.mockReset());
+afterEach(() => {
+  fetchMock.mockReset();
+  nativeShareMock.open.mockReset();
+  nativeShareMock.shareSingle.mockReset();
+  sharingMock.isAvailableAsync.mockReset();
+  sharingMock.shareAsync.mockReset();
+  platformMock.OS = 'web';
+});
 
 describe('interpretQuoteVoice on web', () => {
   it('converts the browser recording blob into a multipart file', async () => {
@@ -61,5 +118,342 @@ describe('interpretQuoteVoice on web', () => {
     expect(audio).toBeInstanceOf(Blob);
     expect(audio).toMatchObject({ name: 'cotali-recording.webm' });
     expect((audio as Blob).type).toBe('audio/webm;codecs=opus');
+  });
+});
+
+describe('listQuoteSummaries', () => {
+  it('loads the authenticated quote summaries', async () => {
+    const summaries = [
+      {
+        client: { name: 'Ana Maria', phone: null },
+        createdAt: '2026-09-04T12:00:00.000Z',
+        id: '9c6d3b5e-8f2a-4b18-9c3d-7a6e5f4b2c1d',
+        paymentStatus: 'pending',
+        revisionNumber: 1,
+        status: 'draft',
+        totalInCents: 15000,
+      },
+    ];
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => summaries,
+    });
+
+    await expect(listQuoteSummaries()).resolves.toEqual(summaries);
+    expect(fetchMock).toHaveBeenCalledWith('http://localhost:3333/v1/quotes', {
+      headers: { authorization: 'Bearer dev:local-user' },
+      method: 'GET',
+    });
+  });
+
+  it('rejects malformed API data', async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => [{ id: 'not-a-summary' }],
+    });
+
+    await expect(listQuoteSummaries()).rejects.toThrow(
+      'A API retornou uma lista de orçamentos inválida.',
+    );
+  });
+});
+
+describe('getQuoteDetails', () => {
+  it('loads a saved quote by id', async () => {
+    const quote = {
+      client: { name: 'Ana Maria', phone: null },
+      conditions: {
+        executionDeadline: null,
+        installmentCount: null,
+        notes: null,
+        paymentMethod: 'Pix',
+        paymentPlanType: 'integral',
+        validUntil: null,
+      },
+      createdAt: '2026-09-04T12:00:00.000Z',
+      discountInCents: 0,
+      id: '9c6d3b5e-8f2a-4b18-9c3d-7a6e5f4b2c1d',
+      materials: [],
+      paymentStatus: 'pending',
+      revisionNumber: 1,
+      services: [
+        {
+          description: 'Instalação',
+          quantity: '1',
+          unit: 'un',
+          unitPriceInCents: 15000,
+        },
+      ],
+      source: 'manual',
+      status: 'draft',
+      totals: {
+        discountInCents: 0,
+        materialsInCents: 0,
+        servicesInCents: 15000,
+        subtotalInCents: 15000,
+        totalInCents: 15000,
+      },
+    };
+    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => quote });
+
+    await expect(getQuoteDetails(quote.id)).resolves.toEqual(quote);
+    expect(fetchMock).toHaveBeenCalledWith(
+      `http://localhost:3333/v1/quotes/${quote.id}`,
+      {
+        headers: { authorization: 'Bearer dev:local-user' },
+        method: 'GET',
+      },
+    );
+  });
+
+  it('rejects malformed detail data', async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ id: 'not-a-detail' }),
+    });
+
+    await expect(getQuoteDetails('not-a-uuid')).rejects.toThrow(
+      'A API retornou um orçamento inválido.',
+    );
+  });
+});
+
+describe('updateQuoteRevision', () => {
+  it('posts an edit command and validates the updated detail', async () => {
+    const quoteId = '9c6d3b5e-8f2a-4b18-9c3d-7a6e5f4b2c1d';
+    const input = {
+      client: { name: 'Ana Maria Atualizada', phone: null },
+      conditions: {
+        executionDeadline: null,
+        installmentCount: null,
+        notes: null,
+        paymentMethod: 'Pix',
+        paymentPlanType: 'integral',
+        validUntil: null,
+      },
+      discountInCents: 0,
+      materials: [],
+      mutationId: '73070f7c-a464-47d7-90bf-b06ac2ce7a1e',
+      services: [
+        {
+          description: 'Instalação atualizada',
+          quantity: '2',
+          unit: 'un',
+          unitPriceInCents: 15000,
+        },
+      ],
+      source: 'mixed',
+    } satisfies UpdateQuoteRevision;
+    const response = {
+      client: input.client,
+      conditions: input.conditions,
+      createdAt: '2026-09-04T12:00:00.000Z',
+      discountInCents: 0,
+      id: quoteId,
+      materials: [],
+      paymentStatus: 'pending',
+      revisionNumber: 2,
+      services: input.services,
+      source: 'mixed',
+      status: 'draft',
+      totals: {
+        discountInCents: 0,
+        materialsInCents: 0,
+        servicesInCents: 30000,
+        subtotalInCents: 30000,
+        totalInCents: 30000,
+      },
+    };
+    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => response });
+
+    await expect(updateQuoteRevision(quoteId, input)).resolves.toEqual(
+      response,
+    );
+    expect(fetchMock).toHaveBeenCalledWith(
+      `http://localhost:3333/v1/quotes/${quoteId}/revisions`,
+      {
+        body: JSON.stringify(input),
+        headers: {
+          authorization: 'Bearer dev:local-user',
+          'content-type': 'application/json',
+        },
+        method: 'POST',
+      },
+    );
+  });
+});
+
+describe('quote proposal PDF', () => {
+  const quoteId = '9c6d3b5e-8f2a-4b18-9c3d-7a6e5f4b2c1d';
+
+  it('downloads the authenticated PDF into the app documents directory', async () => {
+    const arrayBuffer = new TextEncoder().encode('%PDF-1.4').buffer;
+    fetchMock.mockResolvedValueOnce({
+      arrayBuffer: async () => arrayBuffer,
+      ok: true,
+    });
+
+    await expect(downloadQuoteProposal(quoteId)).resolves.toMatchObject({
+      uri: 'file:///documents/cotali-proposal.pdf',
+    });
+    expect(fetchMock).toHaveBeenCalledWith(
+      `http://localhost:3333/v1/quotes/${quoteId}/proposal.pdf`,
+      {
+        headers: { authorization: 'Bearer dev:local-user' },
+        method: 'GET',
+      },
+    );
+  });
+
+  it('downloads and opens the native share sheet', async () => {
+    const arrayBuffer = new TextEncoder().encode('%PDF-1.4').buffer;
+    fetchMock.mockResolvedValueOnce({
+      arrayBuffer: async () => arrayBuffer,
+      ok: true,
+    });
+    sharingMock.isAvailableAsync.mockResolvedValueOnce(true);
+    sharingMock.shareAsync.mockResolvedValueOnce(undefined);
+
+    await expect(shareQuoteProposal(quoteId)).resolves.toBeUndefined();
+    expect(sharingMock.shareAsync).toHaveBeenCalledWith(
+      'file:///documents/cotali-proposal.pdf',
+      {
+        dialogTitle: 'Compartilhar orçamento',
+        mimeType: 'application/pdf',
+      },
+    );
+  });
+
+  it('surfaces API errors instead of saving an invalid response', async () => {
+    fetchMock.mockResolvedValueOnce({
+      json: async () => ({
+        error: { code: 'QUOTE_NOT_FOUND', message: 'Quote not found.' },
+      }),
+      ok: false,
+    });
+
+    await expect(downloadQuoteProposal(quoteId)).rejects.toThrow(
+      'Quote not found.',
+    );
+  });
+
+  it.each([null, '123'])(
+    'opens WhatsApp without targeting a number when the client WhatsApp is missing or invalid (%s)',
+    async (clientPhone) => {
+      platformMock.OS = 'android';
+      const arrayBuffer = new TextEncoder().encode('%PDF-1.4').buffer;
+      fetchMock.mockResolvedValueOnce({
+        arrayBuffer: async () => arrayBuffer,
+        ok: true,
+      });
+      nativeShareMock.shareSingle.mockResolvedValueOnce({
+        message: 'ok',
+        success: true,
+      });
+
+      await expect(
+        shareQuoteProposalToWhatsApp({
+          clientName: 'Ana Maria',
+          clientPhone,
+          quoteId,
+        }),
+      ).resolves.toBeUndefined();
+      expect(fetchMock).toHaveBeenCalledOnce();
+      expect(nativeShareMock.shareSingle).toHaveBeenCalledWith({
+        filename: `cotali-orcamento-${quoteId}.pdf`,
+        message:
+          'Olá, Ana Maria! Segue sua proposta comercial do Cotali em PDF.',
+        social: 'whatsapp',
+        title: 'Proposta Cotali',
+        type: 'application/pdf',
+        url: 'file:///documents/cotali-proposal.pdf',
+      });
+    },
+  );
+
+  it('falls back to the system share sheet when the native WhatsApp module is unavailable', async () => {
+    platformMock.OS = 'android';
+    turboModuleRegistryMock.get.mockReturnValueOnce(null);
+    const arrayBuffer = new TextEncoder().encode('%PDF-1.4').buffer;
+    fetchMock.mockResolvedValueOnce({
+      arrayBuffer: async () => arrayBuffer,
+      ok: true,
+    });
+    sharingMock.isAvailableAsync.mockResolvedValueOnce(true);
+    sharingMock.shareAsync.mockResolvedValueOnce(undefined);
+
+    await expect(
+      shareQuoteProposalToWhatsApp({
+        clientName: 'Ana Maria',
+        clientPhone: '11999999999',
+        quoteId,
+      }),
+    ).resolves.toBeUndefined();
+    expect(sharingMock.shareAsync).toHaveBeenCalledWith(
+      'file:///documents/cotali-proposal.pdf',
+      {
+        dialogTitle: 'Compartilhar orçamento',
+        mimeType: 'application/pdf',
+      },
+    );
+    expect(nativeShareMock.shareSingle).not.toHaveBeenCalled();
+  });
+
+  it('targets WhatsApp with a normalized phone and PDF on Android', async () => {
+    platformMock.OS = 'android';
+    const arrayBuffer = new TextEncoder().encode('%PDF-1.4').buffer;
+    fetchMock.mockResolvedValueOnce({
+      arrayBuffer: async () => arrayBuffer,
+      ok: true,
+    });
+    nativeShareMock.shareSingle.mockResolvedValueOnce({
+      message: 'ok',
+      success: true,
+    });
+
+    await expect(
+      shareQuoteProposalToWhatsApp({
+        clientName: 'Ana Maria',
+        clientPhone: '+55 (11) 99999-9999',
+        quoteId,
+      }),
+    ).resolves.toBeUndefined();
+    expect(nativeShareMock.shareSingle).toHaveBeenCalledWith({
+      filename: `cotali-orcamento-${quoteId}.pdf`,
+      message: 'Olá, Ana Maria! Segue sua proposta comercial do Cotali em PDF.',
+      social: 'whatsapp',
+      title: 'Proposta Cotali',
+      type: 'application/pdf',
+      url: 'file:///documents/cotali-proposal.pdf',
+      whatsAppNumber: '5511999999999',
+    });
+  });
+
+  it('keeps the PDF attachment in the native share sheet on iOS', async () => {
+    platformMock.OS = 'ios';
+    const arrayBuffer = new TextEncoder().encode('%PDF-1.4').buffer;
+    fetchMock.mockResolvedValueOnce({
+      arrayBuffer: async () => arrayBuffer,
+      ok: true,
+    });
+    nativeShareMock.open.mockResolvedValueOnce({
+      message: 'ok',
+      success: true,
+    });
+
+    await expect(
+      shareQuoteProposalToWhatsApp({
+        clientName: 'Ana Maria',
+        clientPhone: '11999999999',
+        quoteId,
+      }),
+    ).resolves.toBeUndefined();
+    expect(nativeShareMock.open).toHaveBeenCalledWith({
+      message: 'Olá, Ana Maria! Segue sua proposta comercial do Cotali em PDF.',
+      title: 'Proposta Cotali',
+      type: 'application/pdf',
+      url: 'file:///documents/cotali-proposal.pdf',
+    });
+    expect(nativeShareMock.shareSingle).not.toHaveBeenCalled();
   });
 });

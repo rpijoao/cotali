@@ -7,6 +7,7 @@ import {
   type ClaimedVoiceJob,
 } from '@cotali/database';
 import { GroqVoiceInterpreter } from '@cotali/voice';
+import { archiveVoiceAudio } from './voice-benchmark-archive.js';
 
 dotenv.config({ path: '../api/.env' });
 dotenv.config();
@@ -29,6 +30,7 @@ const jobs = new PrismaVoiceJobRepository(prisma);
 const interpreter = process.env.GROQ_API_KEY
   ? new GroqVoiceInterpreter({
       apiKey: process.env.GROQ_API_KEY,
+      commandModel: process.env.GROQ_COMMAND_MODEL,
       extractionModel: process.env.GROQ_EXTRACTION_MODEL,
       transcriptionModel: process.env.GROQ_TRANSCRIPTION_MODEL,
     })
@@ -93,6 +95,12 @@ if (!interpreter) {
 async function processJob(job: ClaimedVoiceJob): Promise<void> {
   if (!interpreter) return;
   try {
+    try {
+      await archiveVoiceAudio(job);
+    } catch (error) {
+      // Benchmark archiving is auxiliary and must never break the voice job.
+      console.warn('Não foi possível arquivar o áudio do benchmark.', error);
+    }
     const interpretation = await interpreter.interpret({
       audio: job.audio,
       filename: job.filename,
