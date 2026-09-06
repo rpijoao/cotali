@@ -2,11 +2,12 @@ import type { ReactNode } from 'react';
 
 import { ArrowUpRight, AudioIcon, CheckIcon, Logo } from '../components/landing/primitives';
 import { FlowVisual } from '../components/landing/flow-visual';
+import { ReviewVisual } from '../components/landing/review-visual';
+import { RevealObserver } from '../components/landing/reveal-observer';
+import { ShareVisual } from '../components/landing/share-visual';
 import {
   PhoneMockup,
   QuotePreview,
-  ReviewPreview,
-  WhatsappPreview,
 } from '../components/landing/product-visuals';
 
 const container = 'mx-auto w-full max-w-[1304px] px-8 max-phone:px-5';
@@ -121,7 +122,7 @@ function OutcomesSection() {
     <section className="bg-cotali-white" id="produto">
       <div className={`${container} py-[104px] max-phone:py-[86px]`}>
         <div className="grid grid-cols-[minmax(0,1fr)_minmax(260px,0.58fr)] items-end gap-[70px] max-tablet:grid-cols-1 max-tablet:gap-7">
-          <div>
+          <div data-cotali-reveal>
             <SectionTag number="01" label="o que o Cotali faz" />
             <h2 className={`${editorialHeading} mt-7 max-w-[760px] text-[clamp(3.2rem,5.7vw,5.5rem)] text-cotali-blue max-phone:mt-[23px] max-phone:text-[clamp(2.9rem,14vw,4.2rem)]`}>Uma conversa vira<br /><span className="text-cotali-blue/50">trabalho organizado.</span></h2>
           </div>
@@ -150,7 +151,7 @@ function VoiceToQuoteSection() {
       <div className={`${container} py-[24px] max-phone:py-0`}>
         <div className="overflow-hidden rounded-tl-[110px] rounded-br-[34px] bg-cotali-sky px-[clamp(34px,6vw,86px)] py-[clamp(56px,6vw,88px)] max-phone:rounded-tl-[58px] max-phone:px-5 max-phone:py-[69px]">
           <div className="grid grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] items-center gap-[clamp(38px,7vw,105px)] max-tablet:grid-cols-1">
-            <div className="max-w-[530px]">
+            <div className="max-w-[530px]" data-cotali-reveal>
               <SectionTag number="02" label="da voz à proposta" />
               <h2 className={`${editorialHeading} mt-7 max-w-[600px] text-[clamp(3rem,5vw,5rem)] text-cotali-blue max-phone:mt-[23px] max-phone:text-[clamp(2.9rem,14vw,4.2rem)]`}>Você explica.<br /><span className="text-cotali-blue/50">O orçamento<br />toma forma.</span></h2>
               <p className="mt-8 max-w-[480px] text-base tracking-[-0.015em] leading-[1.6] text-cotali-blue/70 max-phone:mt-[25px] max-phone:text-[15px]">O fluxo começa com uma gravação simples e termina em uma proposta que você consegue revisar.</p>
@@ -173,7 +174,7 @@ function ControlSection() {
           <div className="pointer-events-none absolute -left-24 top-16 size-[340px] rounded-full bg-cotali-blue/25 blur-3xl" aria-hidden="true" />
           <div className="pointer-events-none absolute -right-20 -top-28 size-[300px] rounded-full border border-cotali-white/15" aria-hidden="true" />
           <div className="relative z-10 grid grid-cols-[minmax(0,0.85fr)_minmax(300px,0.75fr)] items-center gap-[clamp(45px,8vw,125px)] max-tablet:grid-cols-1">
-            <div className="max-w-[540px]">
+            <div className="max-w-[540px]" data-cotali-reveal>
               <SectionTag inverse number="03" label="sua decisão" />
               <Eyebrow inverse>você continua no controle</Eyebrow>
               <h2 className="mb-7 mt-[26px] font-cotali-display text-[clamp(3.2rem,5vw,5rem)] font-medium tracking-[-0.09em] leading-[0.94] max-phone:mt-[23px] max-phone:text-[clamp(3.1rem,15vw,4.5rem)]">A sugestão aparece.<br /><em className="not-italic text-cotali-white/75">A decisão é sua.</em></h2>
@@ -187,7 +188,7 @@ function ControlSection() {
                 ))}
               </div>
             </div>
-            <div className="relative mx-auto w-full max-w-[440px] rotate-[3deg] max-tablet:mt-[20px] max-phone:mt-0"><ReviewPreview /></div>
+            <ReviewVisual />
           </div>
         </div>
       </div>
@@ -201,8 +202,8 @@ function ShareSection() {
       <div className={`${container} py-[24px] max-phone:py-0`}>
         <div className="overflow-hidden rounded-tl-[110px] rounded-br-[34px] bg-cotali-cloud px-[clamp(34px,6vw,86px)] py-[clamp(56px,6vw,88px)] max-phone:rounded-tl-[58px] max-phone:px-5 max-phone:py-[69px]">
           <div className="grid grid-cols-[minmax(290px,0.75fr)_minmax(0,1fr)] items-center gap-[clamp(42px,8vw,115px)] max-tablet:grid-cols-1">
-            <div className="order-1 mx-auto w-full max-w-[420px] rotate-[-3deg] max-tablet:order-2 max-tablet:mt-[20px] max-phone:mt-0"><WhatsappPreview /></div>
-            <div className="order-2 max-w-[620px] max-tablet:order-1">
+            <ShareVisual />
+            <div className="order-2 max-w-[620px] max-tablet:order-1" data-cotali-reveal>
               <SectionTag number="04" label="quando estiver pronto" />
               <h2 className={`${editorialHeading} mt-7 text-[clamp(3.2rem,5.4vw,5.3rem)] text-cotali-blue max-phone:mt-[23px] max-phone:text-[clamp(2.9rem,14vw,4.2rem)]`}>A proposta fica clara.<br /><span className="text-cotali-blue/50">O envio fica simples.</span></h2>
               <p className="mt-8 max-w-[500px] text-base tracking-[-0.015em] leading-[1.6] text-cotali-blue/70 max-phone:mt-[25px] max-phone:text-[15px]">Depois da sua revisão, o Cotali prepara o PDF e facilita o compartilhamento pelo WhatsApp.</p>
@@ -220,12 +221,12 @@ function AudienceSection() {
   return (
     <section className={`${container} border-t border-cotali-blue/20 py-[112px] max-phone:py-[86px]`} id="para-quem">
       <div className="grid grid-cols-[minmax(0,1fr)_minmax(280px,0.75fr)] items-start gap-[clamp(45px,9vw,140px)] max-tablet:grid-cols-1 max-tablet:gap-[58px]">
-        <div>
-          <SectionTag number="05" label="feito para a vida real" />
+          <div data-cotali-reveal>
+            <SectionTag number="05" label="feito para a vida real" />
           <h2 className={`${editorialHeading} mt-7 max-w-[700px] text-[clamp(3.2rem,5.7vw,5.5rem)] text-cotali-blue max-phone:mt-[23px] max-phone:text-[clamp(2.9rem,14vw,4.2rem)]`}>Entre uma visita<br /><span className="text-cotali-blue/50">e outra.</span></h2>
           <p className="mt-8 max-w-[500px] text-base tracking-[-0.015em] leading-[1.6] text-cotali-blue/60 max-phone:mt-[25px] max-phone:text-[15px]">Para quem recebe pedidos pelo WhatsApp, trabalha com as próprias mãos e precisa responder enquanto o serviço continua.</p>
         </div>
-        <div className="border-l border-cotali-blue/20 pl-[30px] max-tablet:max-w-[620px] max-phone:border-l-0 max-phone:border-t max-phone:pl-0 max-phone:pt-[26px]">
+        <div className="border-l border-cotali-blue/20 pl-[30px] max-tablet:max-w-[620px] max-phone:border-l-0 max-phone:border-t max-phone:pl-0 max-phone:pt-[26px]" data-cotali-reveal data-cotali-reveal-delay="120">
           <p className="mb-[22px] text-[11px] font-bold uppercase tracking-[0.08em] text-cotali-blue/60">Um orçamento pode começar com:</p>
           {['uma mensagem do cliente', 'uma visita no local', 'uma ideia ainda incompleta', 'uma fala no caminho'].map((item, index) => <span className="flex items-center justify-between border-t border-cotali-blue/20 py-[18px] font-cotali-display text-xl font-medium tracking-[-0.05em] last:border-b" key={item}><span>{item}</span><span className="text-sm text-cotali-blue/40">0{index + 1}</span></span>)}
         </div>
@@ -245,11 +246,11 @@ function QuestionsSection() {
     <section className="border-t border-cotali-blue/20 bg-cotali-sky" id="duvidas">
       <div className={`${container} py-[104px] max-phone:py-[86px]`}>
         <div className="grid grid-cols-[minmax(0,0.7fr)_minmax(0,1fr)] gap-[clamp(45px,8vw,120px)] max-tablet:grid-cols-1 max-tablet:gap-[52px]">
-          <div>
+          <div data-cotali-reveal>
             <SectionTag number="06" label="para ficar claro" />
             <h2 className={`${editorialHeading} mt-7 max-w-[510px] text-[clamp(2.8rem,5vw,4.8rem)] text-cotali-blue max-phone:mt-[23px] max-phone:text-[clamp(2.9rem,14vw,4.2rem)]`}>O que você precisa saber.</h2>
           </div>
-          <div className="border-b border-cotali-blue/20">
+          <div className="border-b border-cotali-blue/20" data-cotali-reveal data-cotali-reveal-delay="120">
             {questions.map(([question, answer]) => (
               <details className="group border-t border-cotali-blue/20" key={question}>
                 <summary className="flex cursor-pointer list-none items-center justify-between gap-[30px] rounded-sm py-[23px] font-cotali-display text-xl font-medium tracking-[-0.05em] transition-colors hover:text-cotali-blue/60 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-cotali-blue marker:hidden max-phone:py-[19px] max-phone:text-[17px]">{question}<span className="text-[22px] font-normal text-cotali-blue/60 transition-transform duration-200 group-open:rotate-45">+</span></summary>
@@ -267,7 +268,7 @@ function ClosingSection() {
   return (
     <section className={`${container} relative min-h-[470px] overflow-hidden rounded-tr-[110px] bg-cotali-blue py-[100px] text-cotali-white max-phone:min-h-[505px] max-phone:rounded-tr-[58px] max-phone:py-[83px]`} id="lancamento">
       <div className="pointer-events-none absolute right-[4%] top-[38px] font-cotali-display text-[clamp(15rem,30vw,29rem)] font-semibold tracking-[-0.18em] leading-[0.75] text-cotali-white/20 max-phone:-right-[9%] max-phone:top-[26px] max-phone:text-[17rem]" aria-hidden="true">c.</div>
-      <div className="relative z-10 max-w-[720px]">
+      <div className="relative z-10 max-w-[720px]" data-cotali-reveal>
         <Eyebrow inverse>o próximo passo</Eyebrow>
         <h2 className="mb-[27px] mt-[26px] font-cotali-display text-[clamp(3.5rem,6vw,6rem)] font-medium tracking-cotali-tight leading-[0.91] max-phone:mt-[23px] max-phone:text-[clamp(3.2rem,15vw,4.8rem)]">Explique o serviço.<br /><em className="not-italic text-cotali-white/80">Veja a proposta tomar forma.</em></h2>
         <p className="max-w-[430px] text-base leading-[1.6] text-cotali-white/75 max-phone:text-[15px]">O Cotali está sendo preparado para profissionais que precisam responder bem, mesmo quando o dia está corrido.</p>
@@ -280,6 +281,7 @@ function ClosingSection() {
 export default function HomePage() {
   return (
     <main className="overflow-x-clip">
+      <RevealObserver />
       <HeroSection />
       <OutcomesSection />
       <VoiceToQuoteSection />
