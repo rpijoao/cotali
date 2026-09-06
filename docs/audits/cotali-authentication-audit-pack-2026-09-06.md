@@ -5,7 +5,7 @@
 - **Status:** pré-auditoria técnica; não é certificação nem aprovação para produção
 - **Escopo:** Better Auth, OTP por email, Google, Apple, sessões, Fastify, web,
   mobile, Resend, consentimento e eventos de valor
-- **Revisão de código:** `3ee75ab` — correção do drift de timestamps do auth/produto
+- **Revisão de código:** `5ac36a5` — testes de ciclo de vida do OTP e isolamento entre contas
 - **Responsável técnico:** produto/engenharia Cotali — preencher responsável nominal
 - **Responsável por privacidade:** preencher antes de publicação
 - **Próxima revisão:** antes do primeiro ambiente de produção e a cada mudança de
@@ -48,13 +48,17 @@ revisão.
   HTTPS explicitamente.
 - O bearer `dev:*` falha em produção, o factory OIDC morto foi removido e a
   `PRIVACY_POLICY_VERSION` agora é obrigatória sem fallback silencioso.
-- A CI passou a executar os três testes de integração PostgreSQL de segurança,
+- A CI passou a executar os quatro testes de integração PostgreSQL de segurança,
   além do teste de quotes existente.
 - A migration `20260906000500_normalize_consent_value_timestamps` corrige o drift
   entre o schema Prisma e as tabelas `consent_records`/`value_events`, interpretando
   os valores legados sem fuso como UTC; o teste de catálogo passou a cobrir 14 colunas.
 - O baseline global do Prettier foi normalizado; `format:check` agora passa em todos
   os arquivos rastreados e o gate permanece ativo na CI.
+- O teste PostgreSQL `auth-lifecycle.integration.test.ts` cobre expiração, hash,
+  cinco tentativas inválidas, rotação no reenvio e uso único do OTP.
+- O teste de integração de quotes cobre dois `authSubject`s e confirma que uma conta
+  não lê quotes da outra por ID nem pela listagem recente. O CI executa ambos.
 
 O desenho do auth está documentado e o primeiro corte está implementado. A base
 passa typecheck, lint, testes, build e auditoria de dependências no checkout local.
@@ -208,7 +212,7 @@ Os únicos eventos de valor aceitos hoje são `QUOTE_CREATED`, `QUOTE_UPDATED` e
 | `AUTH-002` | Tokens de sessão dinâmicos e opacos              | Better Auth usa `AuthSession` persistida; nenhum JWT artesanal no cliente                                                                                             | `IMPLEMENTADO — EVIDÊNCIA PENDENTE` | guardar teste/inspeção de token e revisão de versão do Better Auth                             |
 | `AUTH-003` | Sessão nova e invalidação em autenticação/logout | endpoints Better Auth e tabela persistida                                                                                                                             | `IMPLEMENTADO — EVIDÊNCIA PENDENTE` | testar reautenticação, logout atual e logout global                                            |
 | `AUTH-004` | Cookie, CORS e HTTPS restritos                   | CORS explícito em produção; cookies Better Auth com `httpOnly`, `path=/`, `SameSite` explícito e `secure` conforme HTTPS; logger redige `cookie` e `set-cookie`       | `IMPLEMENTADO — EVIDÊNCIA PENDENTE` | configurar domínios reais, executar HTTPS e teste de preflight/cookie em homologação           |
-| `AUTH-005` | OTP com segredo não recuperável                  | `storeOTP: hashed`, `storeIdentifier: hashed`, sem log do código                                                                                                      | `IMPLEMENTADO — EVIDÊNCIA PENDENTE` | testar banco/logs após envio, tentativa, expiração e uso                                       |
+| `AUTH-005` | OTP com segredo não recuperável                  | `storeOTP: hashed`, `storeIdentifier: hashed`, sem log do código; integração cobre expiração, tentativas, rotação e uso único                                         | `IMPLEMENTADO — EVIDÊNCIA PENDENTE` | repetir em homologação com logs redigidos e Resend real                                        |
 | `AUTH-006` | Throttling contra brute force e abuso de email   | limite OTP 3/60s, bucket HMAC email+IP em `auth_rate_limits` com lock transacional PostgreSQL, limite Better Auth em PostgreSQL e limite HTTP Fastify                 | `IMPLEMENTADO — EVIDÊNCIA PENDENTE` | repetir teste de abuso em homologação, configurar proxy confiável e alertas                    |
 | `AUTH-007` | Respostas anti-enumeração                        | Better Auth mantém `success: true` para email válido existente/novo; entrada inválida e limite têm resposta sem estado de conta; teste automatizado cobre os cenários | `IMPLEMENTADO — EVIDÊNCIA PENDENTE` | executar a matriz em homologação com logs redigidos e anexar resultado                         |
 | `AUTH-008` | OAuth redirect allowlist                         | `AUTH_TRUSTED_ORIGINS` explícito, validação Cotali antes do Better Auth para callbacks OAuth, `trustedOrigins` e secrets por ambiente                                 | `IMPLEMENTADO — EVIDÊNCIA PENDENTE` | anexar configuração Google/Apple por ambiente e executar teste real dos provedores             |
@@ -244,18 +248,18 @@ Os únicos eventos de valor aceitos hoje são `QUOTE_CREATED`, `QUOTE_UPDATED` e
 
 ## 8. Modelo de ameaça e risco residual
 
-| Ativo                   | Ameaça                                     | Controle atual                                                                             | Risco residual                                                   | Próxima evidência                                   |
-| ----------------------- | ------------------------------------------ | ------------------------------------------------------------------------------------------ | ---------------------------------------------------------------- | --------------------------------------------------- |
-| Conta do profissional   | ataque de força bruta ao OTP               | hash, expiração, tentativas e rate limit distribuído por email+IP                          | confiança de proxy, carga/abuso e alertas ainda não evidenciados | teste de carga/abuso e alerta                       |
-| Email do profissional   | takeover do email ou encaminhamento do OTP | OTP temporário e mensagens genéricas                                                       | OTP é autenticação de fator único                                | decisão sobre segundo fator/WebAuthn conforme risco |
-| Identidade Google/Apple | callback forjado ou redirect indevido      | state no banco, allowlist explícita, validação antes do Better Auth e provedor Better Auth | configuração externa e teste real ainda não anexados             | matriz de redirects por ambiente                    |
-| Sessão                  | roubo de cookie/token                      | sessão opaca, SecureStore mobile, redaction                                                | HTTPS/produção e rotação não evidenciados                        | teste de armazenamento, transporte e logout         |
-| Base auth               | vazamento de tokens OAuth/OTP              | criptografia de tokens OAuth e hash de OTP                                                 | chave/backup/acesso e limpeza pendentes                          | evidência de secret manager e restore               |
-| Conta de negócio        | IDOR entre contas                          | `authSubject` vindo da sessão e filtros de conta                                           | cobertura de integração ainda incompleta                         | teste com duas contas e queries negativas           |
-| Marketing               | uso de dados comerciais sem consentimento  | checkbox off, consent record e whitelist                                                   | política, revogação e worker ainda pendentes                     | teste de consentimento e consulta da última decisão |
-| Logs                    | exposição de cookie, auth header ou OTP    | redaction parcial no Fastify                                                               | Better Auth/infra podem ter destinos próprios                    | inspeção de logs reais e acesso restrito            |
-| Disponibilidade         | Resend/OAuth fora do ar                    | sessão existente não depende do provedor                                                   | primeiro login fica indisponível; sem SLO/runbook                | teste de outage e procedimento operacional          |
-| Dados do cliente        | uso de nome/telefone para marketing        | eventos não recebem esses campos                                                           | logs, Resend e exports ainda sem política completa               | DLP/revisão de payloads e retenção                  |
+| Ativo                   | Ameaça                                     | Controle atual                                                                             | Risco residual                                                                                | Próxima evidência                                   |
+| ----------------------- | ------------------------------------------ | ------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------- | --------------------------------------------------- |
+| Conta do profissional   | ataque de força bruta ao OTP               | hash, expiração, tentativas e rate limit distribuído por email+IP                          | confiança de proxy, carga/abuso e alertas ainda não evidenciados                              | teste de carga/abuso e alerta                       |
+| Email do profissional   | takeover do email ou encaminhamento do OTP | OTP temporário e mensagens genéricas                                                       | OTP é autenticação de fator único                                                             | decisão sobre segundo fator/WebAuthn conforme risco |
+| Identidade Google/Apple | callback forjado ou redirect indevido      | state no banco, allowlist explícita, validação antes do Better Auth e provedor Better Auth | configuração externa e teste real ainda não anexados                                          | matriz de redirects por ambiente                    |
+| Sessão                  | roubo de cookie/token                      | sessão opaca, SecureStore mobile, redaction                                                | HTTPS/produção e rotação não evidenciados                                                     | teste de armazenamento, transporte e logout         |
+| Base auth               | vazamento de tokens OAuth/OTP              | criptografia de tokens OAuth e hash de OTP                                                 | chave/backup/acesso e limpeza pendentes                                                       | evidência de secret manager e restore               |
+| Conta de negócio        | IDOR entre contas                          | `authSubject` vindo da sessão e filtros de conta                                           | teste PostgreSQL com dois subjects cobre `getById`/`listRecent`; fluxos reais ainda pendentes | repetir matriz em homologação e rotas de negócio    |
+| Marketing               | uso de dados comerciais sem consentimento  | checkbox off, consent record e whitelist                                                   | política, revogação e worker ainda pendentes                                                  | teste de consentimento e consulta da última decisão |
+| Logs                    | exposição de cookie, auth header ou OTP    | redaction parcial no Fastify                                                               | Better Auth/infra podem ter destinos próprios                                                 | inspeção de logs reais e acesso restrito            |
+| Disponibilidade         | Resend/OAuth fora do ar                    | sessão existente não depende do provedor                                                   | primeiro login fica indisponível; sem SLO/runbook                                             | teste de outage e procedimento operacional          |
+| Dados do cliente        | uso de nome/telefone para marketing        | eventos não recebem esses campos                                                           | logs, Resend e exports ainda sem política completa                                            | DLP/revisão de payloads e retenção                  |
 
 ## 9. Retenção, exclusão e backup
 
@@ -389,12 +393,24 @@ Definir e testar:
 | `prisma migrate diff`                                     | gate configurado na CI com banco shadow isolado; não executado neste checkout por falta de PostgreSQL local/URL shadow                                                            | executar na CI e anexar saída redigida                                                    |
 | PostgreSQL/Neon development                               | branch `development` pronta; migrations e integração executadas com sucesso                                                                                                       | repetir em homologação/branch efêmera                                                     |
 
+### Evidencias adicionadas na revisao `5ac36a5`
+
+- `auth-lifecycle.integration.test.ts`: com PostgreSQL real, os testes verificam
+  OTP armazenado como hash, expiracao, cinco tentativas invalidas, bloqueio apos
+  exceder tentativas, rotacao no reenvio e consumo unico apos login.
+- `prisma-quote-repository.integration.test.ts`: cria dois tenants sinteticos e
+  verifica que `getById` e `listRecent` nunca retornam dados do outro `authSubject`.
+- A execucao conjunta local passou com 5 arquivos e 8 testes de integracao; isso
+  e evidencia tecnica local, nao substitui a execucao remota e a homologacao com
+  Google, Apple e Resend reais.
+
 ### Comandos de evidência de ambiente
 
 ```powershell
 corepack pnpm --filter @cotali/database db:migrate:deploy
 corepack pnpm --filter @cotali/database db:generate
 corepack pnpm --filter @cotali/api exec cross-env RUN_DATABASE_INTEGRATION=true vitest run src/quotes/prisma-quote-repository.integration.test.ts
+corepack pnpm --filter @cotali/api exec cross-env RUN_DATABASE_INTEGRATION=true vitest run src/auth/auth-lifecycle.integration.test.ts
 corepack pnpm --filter @cotali/api exec cross-env RUN_DATABASE_INTEGRATION=true vitest run src/security/security-audit-service.integration.test.ts
 corepack pnpm --filter @cotali/api exec cross-env RUN_DATABASE_INTEGRATION=true vitest run src/auth/auth-timestamps.integration.test.ts
 corepack pnpm --filter @cotali/api exec cross-env RUN_DATABASE_INTEGRATION=true vitest run src/security/otp-rate-limit-service.integration.test.ts
@@ -408,20 +424,20 @@ hash de commit e evidência mínima necessária.
 
 ## 13. Catálogo de evidências a anexar
 
-| Evidência              | Artefato esperado                                            | Dono                  | Status                                             |
-| ---------------------- | ------------------------------------------------------------ | --------------------- | -------------------------------------------------- |
-| versão exata do código | commit/tag e lockfile                                        | engenharia            | `PARCIAL` — atualizar para o commit desta correção |
-| schema/migrations      | SQL revisado, saída de deploy e validação                    | engenharia/DBA        | `PARCIAL`                                          |
-| CI                     | URL de execução verde e artefatos                            | engenharia            | `PENDENTE`                                         |
-| dependências           | `pnpm audit`, lockfile e política de atualização             | engenharia            | `PARCIAL`                                          |
-| OAuth Google           | client, redirect URIs, projeto e owner; sem secret           | engenharia            | `PENDENTE`                                         |
-| OAuth Apple            | Services ID, bundle IDs, key owner, redirects e relay        | engenharia            | `PENDENTE`                                         |
-| Resend                 | domínio autenticado, remetente, eventos e DPA                | operações/privacidade | `PENDENTE`                                         |
-| testes auth            | matriz OTP/social/sessão/linking/logout                      | QA/engenharia         | `PENDENTE`                                         |
-| logs                   | amostras redigidas e política de acesso/retencão             | operações             | `PENDENTE`                                         |
-| backup/restore         | relatório de restauração bem-sucedida                        | operações/DBA         | `PENDENTE`                                         |
-| privacidade            | política aprovada, registro de tratamento e canal do titular | privacidade/jurídico  | `PENDENTE`                                         |
-| incidente              | runbook, contatos e simulado                                 | operações             | `PENDENTE`                                         |
+| Evidência              | Artefato esperado                                            | Dono                  | Status                                                                                                      |
+| ---------------------- | ------------------------------------------------------------ | --------------------- | ----------------------------------------------------------------------------------------------------------- |
+| versão exata do código | commit/tag e lockfile                                        | engenharia            | `IMPLEMENTADO` — commit técnico `5ac36a5`; tag e aprovação formal ainda pendentes                           |
+| schema/migrations      | SQL revisado, saída de deploy e validação                    | engenharia/DBA        | `PARCIAL`                                                                                                   |
+| CI                     | URL de execução verde e artefatos                            | engenharia            | `PENDENTE`                                                                                                  |
+| dependências           | `pnpm audit`, lockfile e política de atualização             | engenharia            | `PARCIAL`                                                                                                   |
+| OAuth Google           | client, redirect URIs, projeto e owner; sem secret           | engenharia            | `PENDENTE`                                                                                                  |
+| OAuth Apple            | Services ID, bundle IDs, key owner, redirects e relay        | engenharia            | `PENDENTE`                                                                                                  |
+| Resend                 | domínio autenticado, remetente, eventos e DPA                | operações/privacidade | `PENDENTE`                                                                                                  |
+| testes auth            | matriz OTP/social/sessão/linking/logout                      | QA/engenharia         | `PARCIAL` — OTP e isolamento multi-tenant cobertos localmente; provedores, sessão e linking ainda pendentes |
+| logs                   | amostras redigidas e política de acesso/retencão             | operações             | `PENDENTE`                                                                                                  |
+| backup/restore         | relatório de restauração bem-sucedida                        | operações/DBA         | `PENDENTE`                                                                                                  |
+| privacidade            | política aprovada, registro de tratamento e canal do titular | privacidade/jurídico  | `PENDENTE`                                                                                                  |
+| incidente              | runbook, contatos e simulado                                 | operações             | `PENDENTE`                                                                                                  |
 
 ## 14. Gate de liberação para produção
 
@@ -451,6 +467,7 @@ Marcar somente com evidência anexada:
 | 2026-09-06 | Consentimento e eventos de valor separados do auth                 | ADR-003, schema e rotas                                                                              | preencher |
 | 2026-09-06 | Timestamps do auth e do produto normalizados para `TIMESTAMPTZ(3)` | migrations 004/005, `migrate deploy/status`, Prisma validate e teste de catálogo em Neon development | preencher |
 | 2026-09-06 | Anti-enumeração de email OTP explicitada e testada                 | `disableSignUp: false` e cenários de email válido, inválido e bloqueado                              | preencher |
+| 2026-09-06 | Ciclo de vida do OTP e isolamento entre contas cobertos            | commit `5ac36a5`; PostgreSQL real; 5 arquivos e 8 testes de integração verdes                        | preencher |
 | 2026-09-06 | Trilha mínima de segurança adicionada                              | schema, trigger, serviço, handler e testes                                                           | preencher |
 | 2026-09-06 | Migrations aplicadas na branch Neon development                    | `migrate deploy`, status up to date e integração                                                     | preencher |
 | 2026-09-06 | Pacote de auditoria criado                                         | lacunas de evidência e operação identificadas                                                        | preencher |

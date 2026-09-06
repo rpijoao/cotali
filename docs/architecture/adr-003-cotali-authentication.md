@@ -233,6 +233,11 @@ com o schema Prisma.
 8. Confirmar a gravação, proteção append-only, consulta restrita, alerta de falha
    e retenção aprovada da trilha `security_audit_events`.
 
+Evidência técnica adicionada no commit `5ac36a5`: a integração PostgreSQL cobre o
+ciclo de vida do email OTP (hash, expiração, tentativas, rotação e uso único) e o
+isolamento entre dois `authSubject`s nas consultas de quotes. Essa evidência não
+substitui a homologação com Google, Apple e Resend reais nem os testes web/mobile.
+
 ## Referências
 
 - [Better Auth — Expo](https://better-auth.com/docs/integrations/expo)
