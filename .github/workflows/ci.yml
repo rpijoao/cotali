@@ -86,6 +86,7 @@ jobs:
           pnpm --filter @cotali/api exec cross-env RUN_DATABASE_INTEGRATION=true
           vitest run
           src/quotes/prisma-quote-repository.integration.test.ts
+          src/auth/auth-lifecycle.integration.test.ts
           src/security/security-audit-service.integration.test.ts
           src/auth/auth-timestamps.integration.test.ts
           src/security/otp-rate-limit-service.integration.test.ts
