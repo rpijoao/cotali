@@ -4,7 +4,9 @@ import { useEffect } from 'react';
 
 export function RevealObserver() {
   useEffect(() => {
-    const revealElements = [...document.querySelectorAll<HTMLElement>('[data-cotali-reveal]')];
+    const revealElements = [
+      ...document.querySelectorAll<HTMLElement>('[data-cotali-reveal]'),
+    ];
 
     if (revealElements.length === 0) {
       return;
@@ -21,7 +23,9 @@ export function RevealObserver() {
     document.body.classList.add('cotali-reveal-ready');
 
     if (!('IntersectionObserver' in window)) {
-      revealElements.forEach((element) => element.classList.add('cotali-reveal-visible'));
+      revealElements.forEach((element) =>
+        element.classList.add('cotali-reveal-visible'),
+      );
       return () => document.body.classList.remove('cotali-reveal-ready');
     }
 

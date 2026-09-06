@@ -27,7 +27,11 @@ export function ReviewVisual() {
       const end = window.innerHeight * 0.2;
       const nextProgress = clamp((start - top) / (start - end));
 
-      setProgress((currentProgress) => (Math.abs(currentProgress - nextProgress) > 0.003 ? nextProgress : currentProgress));
+      setProgress((currentProgress) =>
+        Math.abs(currentProgress - nextProgress) > 0.003
+          ? nextProgress
+          : currentProgress,
+      );
     };
 
     const scheduleUpdate = () => {
@@ -61,13 +65,15 @@ export function ReviewVisual() {
     clamp((progress - 0.24) / 0.3),
     clamp((progress - 0.46) / 0.3),
   ];
-  const motionStyle = (isScrollLinked
-    ? {
-        '--cotali-review-client-progress': itemProgress[0],
-        '--cotali-review-service-progress': itemProgress[1],
-        '--cotali-review-pending-progress': itemProgress[2],
-      }
-    : undefined) as CSSProperties | undefined;
+  const motionStyle = (
+    isScrollLinked
+      ? {
+          '--cotali-review-client-progress': itemProgress[0],
+          '--cotali-review-service-progress': itemProgress[1],
+          '--cotali-review-pending-progress': itemProgress[2],
+        }
+      : undefined
+  ) as CSSProperties | undefined;
 
   return (
     <div

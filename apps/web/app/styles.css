@@ -48,7 +48,6 @@
       transform: translateY(-8px) rotate(1deg);
     }
   }
-
 }
 
 .cotali-flow-stage {
@@ -57,12 +56,14 @@
 
 .cotali-flow-scene--scroll-linked .cotali-flow-stage--voice {
   opacity: calc(0.3 + (var(--cotali-flow-voice-opacity-progress) * 0.7));
-  translate: calc((1 - var(--cotali-flow-voice-progress)) * -64px) calc((1 - var(--cotali-flow-voice-progress)) * 22px);
+  translate: calc((1 - var(--cotali-flow-voice-progress)) * -64px)
+    calc((1 - var(--cotali-flow-voice-progress)) * 22px);
 }
 
 .cotali-flow-scene--scroll-linked .cotali-flow-stage--quote {
   opacity: calc(0.3 + (var(--cotali-flow-quote-opacity-progress) * 0.7));
-  translate: calc((1 - var(--cotali-flow-quote-progress)) * 64px) calc((1 - var(--cotali-flow-quote-progress)) * 24px);
+  translate: calc((1 - var(--cotali-flow-quote-progress)) * 64px)
+    calc((1 - var(--cotali-flow-quote-progress)) * 24px);
 }
 
 .cotali-flow-wave i {
@@ -77,7 +78,11 @@
 .cotali-review-card > .mt-5 > div {
   will-change: translate, opacity;
   transform-origin: center;
-  transition: translate 180ms linear, scale 180ms linear, opacity 180ms linear, box-shadow 180ms linear;
+  transition:
+    translate 180ms linear,
+    scale 180ms linear,
+    opacity 180ms linear,
+    box-shadow 180ms linear;
 }
 
 .cotali-review-card {
@@ -154,26 +159,39 @@
   color: #1846e1;
 }
 
-.cotali-review-scene--scroll-linked .cotali-review-card > .mt-5 > div:nth-child(1) {
+.cotali-review-scene--scroll-linked
+  .cotali-review-card
+  > .mt-5
+  > div:nth-child(1) {
   opacity: calc(0.06 + (var(--cotali-review-client-progress) * 0.94));
   translate: 0 calc((1 - var(--cotali-review-client-progress)) * 48px);
   scale: calc(0.94 + (var(--cotali-review-client-progress) * 0.06));
 }
 
-.cotali-review-scene--scroll-linked .cotali-review-card > .mt-5 > div:nth-child(2) {
+.cotali-review-scene--scroll-linked
+  .cotali-review-card
+  > .mt-5
+  > div:nth-child(2) {
   opacity: calc(0.06 + (var(--cotali-review-service-progress) * 0.94));
   translate: 0 calc((1 - var(--cotali-review-service-progress)) * 48px);
   scale: calc(0.94 + (var(--cotali-review-service-progress) * 0.06));
 }
 
-.cotali-review-scene--scroll-linked .cotali-review-card > .mt-5 > div:nth-child(3) {
+.cotali-review-scene--scroll-linked
+  .cotali-review-card
+  > .mt-5
+  > div:nth-child(3) {
   opacity: calc(0.06 + (var(--cotali-review-pending-progress) * 0.94));
   translate: 0 calc((1 - var(--cotali-review-pending-progress)) * 48px);
   scale: calc(0.94 + (var(--cotali-review-pending-progress) * 0.06));
-  box-shadow: 0 0 0 1px rgb(24 70 225 / calc(0.08 + (var(--cotali-review-pending-progress) * 0.2)));
+  box-shadow: 0 0 0 1px
+    rgb(24 70 225 / calc(0.08 + (var(--cotali-review-pending-progress) * 0.2)));
 }
 
-.cotali-review-scene--scroll-linked .cotali-review-card > div:first-child > span:nth-child(2) {
+.cotali-review-scene--scroll-linked
+  .cotali-review-card
+  > div:first-child
+  > span:nth-child(2) {
   opacity: calc(0.55 + (var(--cotali-review-pending-progress) * 0.45));
   transition: opacity 180ms linear;
 }
@@ -183,7 +201,10 @@
 .cotali-share-card > div:nth-child(2) > div:nth-child(4) {
   will-change: translate, opacity;
   transform-origin: center;
-  transition: translate 180ms linear, scale 180ms linear, opacity 180ms linear;
+  transition:
+    translate 180ms linear,
+    scale 180ms linear,
+    opacity 180ms linear;
 }
 
 .cotali-share-card > div:nth-child(2) {
@@ -226,21 +247,33 @@
   font-size: 1rem;
 }
 
-.cotali-share-scene--scroll-linked .cotali-share-card > div:nth-child(2) > div:nth-child(2) {
+.cotali-share-scene--scroll-linked
+  .cotali-share-card
+  > div:nth-child(2)
+  > div:nth-child(2) {
   opacity: calc(0.06 + (var(--cotali-share-request-progress) * 0.94));
-  translate: calc((1 - var(--cotali-share-request-progress)) * -42px) calc((1 - var(--cotali-share-request-progress)) * 20px);
+  translate: calc((1 - var(--cotali-share-request-progress)) * -42px)
+    calc((1 - var(--cotali-share-request-progress)) * 20px);
   scale: calc(0.94 + (var(--cotali-share-request-progress) * 0.06));
 }
 
-.cotali-share-scene--scroll-linked .cotali-share-card > div:nth-child(2) > div:nth-child(3) {
+.cotali-share-scene--scroll-linked
+  .cotali-share-card
+  > div:nth-child(2)
+  > div:nth-child(3) {
   opacity: calc(0.06 + (var(--cotali-share-response-progress) * 0.94));
-  translate: calc((1 - var(--cotali-share-response-progress)) * 42px) calc((1 - var(--cotali-share-response-progress)) * 20px);
+  translate: calc((1 - var(--cotali-share-response-progress)) * 42px)
+    calc((1 - var(--cotali-share-response-progress)) * 20px);
   scale: calc(0.94 + (var(--cotali-share-response-progress) * 0.06));
 }
 
-.cotali-share-scene--scroll-linked .cotali-share-card > div:nth-child(2) > div:nth-child(4) {
+.cotali-share-scene--scroll-linked
+  .cotali-share-card
+  > div:nth-child(2)
+  > div:nth-child(4) {
   opacity: calc(0.06 + (var(--cotali-share-pdf-progress) * 0.94));
-  translate: calc((1 - var(--cotali-share-pdf-progress)) * 42px) calc((1 - var(--cotali-share-pdf-progress)) * 20px);
+  translate: calc((1 - var(--cotali-share-pdf-progress)) * 42px)
+    calc((1 - var(--cotali-share-pdf-progress)) * 20px);
   scale: calc(0.94 + (var(--cotali-share-pdf-progress) * 0.06));
 }
 
@@ -251,7 +284,9 @@
 body.cotali-reveal-ready [data-cotali-reveal] {
   opacity: 0;
   translate: 0 28px;
-  transition: opacity 900ms cubic-bezier(0.22, 1, 0.36, 1), translate 900ms cubic-bezier(0.22, 1, 0.36, 1);
+  transition:
+    opacity 900ms cubic-bezier(0.22, 1, 0.36, 1),
+    translate 900ms cubic-bezier(0.22, 1, 0.36, 1);
   transition-delay: var(--cotali-reveal-delay);
   will-change: translate, opacity;
 }
@@ -280,7 +315,10 @@ body.cotali-reveal-ready [data-cotali-reveal].cotali-reveal-visible {
     transition: none;
   }
 
-  .cotali-review-scene--scroll-linked .cotali-review-card > div:first-child > span:nth-child(2) {
+  .cotali-review-scene--scroll-linked
+    .cotali-review-card
+    > div:first-child
+    > span:nth-child(2) {
     opacity: 1;
     transition: none;
   }
