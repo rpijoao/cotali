@@ -5,7 +5,7 @@
 - **Status:** pré-auditoria técnica; não é certificação nem aprovação para produção
 - **Escopo:** Better Auth, OTP por email, Google, Apple, sessões, Fastify, web,
   mobile, Resend, consentimento e eventos de valor
-- **Revisão de código:** `cd75cef` + correções técnicas desta reauditoria
+- **Revisão de código:** `46437d7` — correções técnicas desta reauditoria
 - **Responsável técnico:** produto/engenharia Cotali — preencher responsável nominal
 - **Responsável por privacidade:** preencher antes de publicação
 - **Próxima revisão:** antes do primeiro ambiente de produção e a cada mudança de
