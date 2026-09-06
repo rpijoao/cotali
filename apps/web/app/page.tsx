@@ -119,7 +119,7 @@ function StoreButtons() {
   const appStoreUrl = process.env.NEXT_PUBLIC_APP_STORE_URL;
 
   return (
-    <div className="mt-[39px] flex flex-wrap gap-3 max-phone:mt-[33px]">
+    <div className="mt-[39px] flex flex-wrap gap-3 max-phone:mt-[12px]">
       {appStoreUrl ? (
         <a
           className="inline-flex items-center gap-2.5 rounded-xl bg-cotali-ink px-3.5 py-2.5 text-left text-cotali-white shadow-sm transition-colors duration-200 hover:bg-cotali-navy focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-cotali-white"
