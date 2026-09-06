@@ -132,8 +132,10 @@ auditoria, use o [pacote de controles e evidências](./docs/audits/cotali-authen
 e a [minuta técnica de privacidade](./docs/privacy/cotali-privacy-notice-draft-2026-09-06.md).
 
 Para desenvolvimento sem credenciais sociais, use o OTP com um domínio de
-envio válido no Resend. A API continua usando a mesma sessão Better Auth; não
-existe bypass de bearer token no fluxo normal.
+envio válido no Resend. A API continua usando a mesma sessão Better Auth.
+Para testes locais de módulos legados, o bearer `dev:*` de teste só é aceito quando `AUTH_MODE=development` e
+`NODE_ENV` não é `production`; esse caminho é rejeitado pelo servidor em
+produção.
 
 O teste do adaptador PostgreSQL real é habilitado explicitamente com `RUN_DATABASE_INTEGRATION=true`. Ele usa `TEST_DATABASE_URL` quando definida e, caso contrário, a `DATABASE_URL` de `apps/api/.env`.
 

@@ -107,6 +107,7 @@ export function createCotaliAuth(
       fields: { lastRequest: 'last_request' },
     },
     advanced: {
+      ...resolveAuthCookiePolicy(baseURL),
       database: { joins: true },
       ipAddress: { ipAddressHeaders: ['x-cotali-client-ip'] },
     },
@@ -266,6 +267,49 @@ function normalizeTrustedOrigin(value: string, variableName: string): string {
 
 function unique(origins: string[]): string[] {
   return [...new Set(origins)];
+}
+
+export type AuthCookieSameSite = 'lax' | 'strict' | 'none';
+
+export function resolveAuthCookiePolicy(baseURL: string) {
+  let parsedBaseURL: URL;
+  try {
+    parsedBaseURL = new URL(baseURL);
+  } catch {
+    throw new Error(`BETTER_AUTH_URL is invalid: ${baseURL}`);
+  }
+
+  if (!['http:', 'https:'].includes(parsedBaseURL.protocol)) {
+    throw new Error('BETTER_AUTH_URL deve usar HTTP ou HTTPS.');
+  }
+
+  const secure = parsedBaseURL.protocol === 'https:';
+  if (process.env.NODE_ENV === 'production' && !secure) {
+    throw new Error('BETTER_AUTH_URL must use HTTPS in production.');
+  }
+
+  const sameSite = readAuthCookieSameSite(secure);
+  return {
+    useSecureCookies: secure,
+    defaultCookieAttributes: {
+      httpOnly: true,
+      secure,
+      sameSite,
+      path: '/',
+    },
+  };
+}
+
+function readAuthCookieSameSite(secure: boolean): AuthCookieSameSite {
+  const configured = process.env.AUTH_COOKIE_SAME_SITE?.trim().toLowerCase();
+  const sameSite = configured || 'lax';
+  if (sameSite !== 'lax' && sameSite !== 'strict' && sameSite !== 'none') {
+    throw new Error('AUTH_COOKIE_SAME_SITE deve ser lax, strict ou none.');
+  }
+  if (sameSite === 'none' && !secure) {
+    throw new Error('AUTH_COOKIE_SAME_SITE=none requires HTTPS.');
+  }
+  return sameSite;
 }
 
 function requiredEnvironment(name: string): string {

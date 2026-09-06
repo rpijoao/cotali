@@ -76,6 +76,9 @@ concorrentes no PostgreSQL Neon de desenvolvimento.
 
 - Web usa cookie seguro emitido pelo Better Auth e requisições com
   `credentials: include`.
+  A API declara `httpOnly`, `path=/`, `secure` conforme o protocolo da API e
+  `SameSite=lax` por padrão. `AUTH_COOKIE_SAME_SITE=none` só pode ser usado
+  explicitamente com HTTPS; cookies de produção exigem `BETTER_AUTH_URL` HTTPS.
 - Android usa `@better-auth/expo` e `expo-secure-store`; chamadas à API de
   negócio recuperam o cookie armazenado e o enviam no header `Cookie`.
 - A sessão expira após 30 dias de inatividade e é renovada diariamente quando
@@ -151,6 +154,8 @@ O arquivo `apps/api/.env.example` contém os nomes. Em produção são obrigató
   para OAuth; curingas não são aceitos em produção.
 - `TRUSTED_PROXY_HOPS` deve refletir a topologia real quando a API estiver atrás
   de proxy; o valor `0` é o padrão seguro para conexão direta.
+- `AUTH_COOKIE_SAME_SITE` aceita `lax`, `strict` ou `none`; o padrão é `lax`.
+  O valor `none` exige HTTPS e deve ser usado somente após revisão de CSRF.
 
 Os redirects OAuth de Google e Apple devem apontar para o endpoint Better Auth
 do ambiente correspondente (`/v1/auth/callback/google` ou

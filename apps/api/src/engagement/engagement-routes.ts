@@ -21,6 +21,8 @@ export async function registerEngagementRoutes(
   authenticator: Authenticator,
   engagement: EngagementService,
 ): Promise<void> {
+  const policyVersion = resolvePrivacyPolicyVersion();
+
   app.post<{ Body: { channel: 'mobile' | 'web'; granted: boolean } }>(
     '/v1/privacy/consents/marketing-email',
     {
@@ -36,8 +38,6 @@ export async function registerEngagementRoutes(
     async (request, reply) => {
       try {
         const identity = await authenticator.authenticate(request.headers);
-        const policyVersion =
-          process.env.PRIVACY_POLICY_VERSION ?? '2026-09-06';
         await engagement.recordMarketingConsent({
           authSubject: identity.subject,
           channel: request.body.channel,
@@ -55,4 +55,12 @@ export async function registerEngagementRoutes(
       }
     },
   );
+}
+
+export function resolvePrivacyPolicyVersion(): string {
+  const policyVersion = process.env.PRIVACY_POLICY_VERSION?.trim();
+  if (!policyVersion) {
+    throw new Error('PRIVACY_POLICY_VERSION is required.');
+  }
+  return policyVersion;
 }

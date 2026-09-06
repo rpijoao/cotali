@@ -1,4 +1,3 @@
-import { createRemoteJWKSet, jwtVerify } from 'jose';
 import { fromNodeHeaders } from 'better-auth/node';
 import type { Auth } from 'better-auth';
 
@@ -18,37 +17,19 @@ export class AuthenticationError extends Error {
   }
 }
 
-export class OidcAuthenticator implements Authenticator {
-  readonly #jwks;
-
-  constructor(
-    private readonly config: Readonly<{
-      audience: string;
-      issuer: string;
-      jwksUrl: string;
-    }>,
-  ) {
-    this.#jwks = createRemoteJWKSet(new URL(config.jwksUrl));
-  }
-
-  async authenticate(input: AuthenticationInput): Promise<Identity> {
-    const token = readBearerToken(readAuthorization(input));
-    try {
-      const { payload } = await jwtVerify(token, this.#jwks, {
-        audience: this.config.audience,
-        issuer: this.config.issuer,
-      });
-      if (!payload.sub) throw new AuthenticationError('Token has no subject.');
-      return { subject: payload.sub };
-    } catch (error) {
-      if (error instanceof AuthenticationError) throw error;
-      throw new AuthenticationError('The access token is invalid.');
+export class DevelopmentAuthenticator implements Authenticator {
+  constructor() {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('Development authentication is disabled in production.');
     }
   }
-}
 
-export class DevelopmentAuthenticator implements Authenticator {
   async authenticate(input: AuthenticationInput): Promise<Identity> {
+    if (process.env.NODE_ENV === 'production') {
+      throw new AuthenticationError(
+        'Development authentication is disabled in production.',
+      );
+    }
     const token = readBearerToken(readAuthorization(input));
     if (!token.startsWith('dev:') || token.length <= 4) {
       throw new AuthenticationError('Use a development bearer token.');
