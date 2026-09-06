@@ -191,6 +191,12 @@ function HeroSection() {
         >
           ver como funciona <ArrowUpRight />
         </a>
+        <a
+          className="ml-3 rounded-full border border-cotali-white/35 px-4 py-2.5 text-[13px] font-bold text-cotali-white transition-colors duration-200 hover:bg-cotali-white/10 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-cotali-white"
+          href="/login"
+        >
+          entrar
+        </a>
       </header>
 
       <div

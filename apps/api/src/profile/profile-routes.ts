@@ -26,9 +26,7 @@ export async function registerProfileRoutes(
     },
     async (request, reply) => {
       try {
-        const identity = await authenticator.authenticate(
-          request.headers.authorization,
-        );
+        const identity = await authenticator.authenticate(request.headers);
         return await profileService.get(identity.subject);
       } catch (error) {
         if (error instanceof AuthenticationError) {
@@ -52,9 +50,7 @@ export async function registerProfileRoutes(
     },
     async (request, reply) => {
       try {
-        const identity = await authenticator.authenticate(
-          request.headers.authorization,
-        );
+        const identity = await authenticator.authenticate(request.headers);
         return await profileService.update(identity.subject, request.body);
       } catch (error) {
         if (error instanceof AuthenticationError) {

@@ -22,12 +22,14 @@ import {
   type QuoteService,
 } from './quote-service.js';
 import { renderQuotePdf } from './quote-pdf.js';
+import type { EngagementService } from '../engagement/engagement-service.js';
 
 export async function registerQuoteRoutes(
   app: FastifyInstance,
   authenticator: Authenticator,
   quoteService: QuoteService,
   profileService?: ProfileService,
+  engagement?: EngagementService,
 ) {
   app.get(
     '/v1/quotes',
@@ -42,9 +44,7 @@ export async function registerQuoteRoutes(
     },
     async (request, reply) => {
       try {
-        const identity = await authenticator.authenticate(
-          request.headers.authorization,
-        );
+        const identity = await authenticator.authenticate(request.headers);
         return await quoteService.listRecent(identity.subject);
       } catch (error) {
         if (error instanceof AuthenticationError) {
@@ -72,9 +72,7 @@ export async function registerQuoteRoutes(
     },
     async (request, reply) => {
       try {
-        const identity = await authenticator.authenticate(
-          request.headers.authorization,
-        );
+        const identity = await authenticator.authenticate(request.headers);
         const quote = await quoteService.getById(
           identity.subject,
           request.params.id,
@@ -118,9 +116,7 @@ export async function registerQuoteRoutes(
     },
     async (request, reply) => {
       try {
-        const identity = await authenticator.authenticate(
-          request.headers.authorization,
-        );
+        const identity = await authenticator.authenticate(request.headers);
         const quote = await quoteService.getById(
           identity.subject,
           request.params.id,
@@ -158,13 +154,17 @@ export async function registerQuoteRoutes(
     },
     async (request, reply) => {
       try {
-        const identity = await authenticator.authenticate(
-          request.headers.authorization,
-        );
+        const identity = await authenticator.authenticate(request.headers);
         const quote = await quoteService.createDraft(
           identity.subject,
           request.body,
         );
+        await recordValueEvent(engagement, {
+          authSubject: identity.subject,
+          eventKey: `create:${request.body.mutationId}`,
+          name: 'quote_created',
+          metadata: { source: request.body.source },
+        });
         return await reply.status(201).send(quote);
       } catch (error) {
         if (error instanceof AuthenticationError) {
@@ -211,14 +211,19 @@ export async function registerQuoteRoutes(
     },
     async (request, reply) => {
       try {
-        const identity = await authenticator.authenticate(
-          request.headers.authorization,
-        );
-        return await quoteService.updateDraft(
+        const identity = await authenticator.authenticate(request.headers);
+        const quote = await quoteService.updateDraft(
           identity.subject,
           request.params.id,
           request.body,
         );
+        await recordValueEvent(engagement, {
+          authSubject: identity.subject,
+          eventKey: `update:${request.body.mutationId}`,
+          name: 'quote_updated',
+          metadata: { quoteId: request.params.id },
+        });
+        return quote;
       } catch (error) {
         if (error instanceof AuthenticationError) {
           return await reply.status(401).send({
@@ -251,4 +256,17 @@ export async function registerQuoteRoutes(
       }
     },
   );
+}
+
+async function recordValueEvent(
+  engagement: EngagementService | undefined,
+  input: Parameters<EngagementService['recordValueEvent']>[0],
+): Promise<void> {
+  if (!engagement) return;
+  try {
+    await engagement.recordValueEvent(input);
+  } catch {
+    // Engagement telemetry must never turn a successful domain operation into
+    // a failed quote request.
+  }
 }

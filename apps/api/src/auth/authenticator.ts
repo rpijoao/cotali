@@ -1,9 +1,14 @@
 import { createRemoteJWKSet, jwtVerify } from 'jose';
+import { fromNodeHeaders } from 'better-auth/node';
+import type { Auth } from 'better-auth';
+
+export type AuthenticationInput =
+  string | Readonly<Record<string, string | string[] | undefined>> | undefined;
 
 export type Identity = Readonly<{ subject: string }>;
 
 export interface Authenticator {
-  authenticate(authorization: string | undefined): Promise<Identity>;
+  authenticate(input: AuthenticationInput): Promise<Identity>;
 }
 
 export class AuthenticationError extends Error {
@@ -26,8 +31,8 @@ export class OidcAuthenticator implements Authenticator {
     this.#jwks = createRemoteJWKSet(new URL(config.jwksUrl));
   }
 
-  async authenticate(authorization: string | undefined): Promise<Identity> {
-    const token = readBearerToken(authorization);
+  async authenticate(input: AuthenticationInput): Promise<Identity> {
+    const token = readBearerToken(readAuthorization(input));
     try {
       const { payload } = await jwtVerify(token, this.#jwks, {
         audience: this.config.audience,
@@ -43,8 +48,8 @@ export class OidcAuthenticator implements Authenticator {
 }
 
 export class DevelopmentAuthenticator implements Authenticator {
-  async authenticate(authorization: string | undefined): Promise<Identity> {
-    const token = readBearerToken(authorization);
+  async authenticate(input: AuthenticationInput): Promise<Identity> {
+    const token = readBearerToken(readAuthorization(input));
     if (!token.startsWith('dev:') || token.length <= 4) {
       throw new AuthenticationError('Use a development bearer token.');
     }
@@ -58,6 +63,33 @@ export class StaticAuthenticator implements Authenticator {
   async authenticate(): Promise<Identity> {
     return { subject: this.subject };
   }
+}
+
+export class BetterAuthAuthenticator implements Authenticator {
+  constructor(private readonly auth: Pick<Auth, 'api'>) {}
+
+  async authenticate(input: AuthenticationInput): Promise<Identity> {
+    if (typeof input === 'string' || input === undefined) {
+      throw new AuthenticationError();
+    }
+
+    try {
+      const session = await this.auth.api.getSession({
+        headers: fromNodeHeaders(input),
+      });
+      if (!session?.user.id) throw new AuthenticationError();
+      return { subject: session.user.id };
+    } catch (error) {
+      if (error instanceof AuthenticationError) throw error;
+      throw new AuthenticationError('The session is invalid or expired.');
+    }
+  }
+}
+
+function readAuthorization(input: AuthenticationInput): string | undefined {
+  if (typeof input === 'string' || input === undefined) return input;
+  const authorization = input.authorization;
+  return Array.isArray(authorization) ? authorization[0] : authorization;
 }
 
 function readBearerToken(authorization: string | undefined): string {

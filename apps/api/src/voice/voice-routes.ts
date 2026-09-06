@@ -50,9 +50,7 @@ export async function registerVoiceRoutes(
     },
     handler: async (request, reply) => {
       try {
-        const identity = await authenticator.authenticate(
-          request.headers.authorization,
-        );
+        const identity = await authenticator.authenticate(request.headers);
 
         if (!voiceJobs && !voiceInterpreter) {
           return await reply.status(503).send({
@@ -123,7 +121,7 @@ export async function registerVoiceRoutes(
     },
     handler: async (request, reply) => {
       try {
-        await authenticator.authenticate(request.headers.authorization);
+        await authenticator.authenticate(request.headers);
 
         if (!voiceCommandInterpreter) {
           return await reply.status(503).send({
@@ -181,9 +179,7 @@ export async function registerVoiceRoutes(
       },
       handler: async (request, reply) => {
         try {
-          const identity = await authenticator.authenticate(
-            request.headers.authorization,
-          );
+          const identity = await authenticator.authenticate(request.headers);
           if (!voiceJobs) {
             return await reply.status(503).send({
               error: {
