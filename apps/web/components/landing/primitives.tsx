@@ -55,9 +55,9 @@ export function Logo() {
   );
 }
 
-export function AudioBars() {
+export function AudioBars({ animated = false }: { animated?: boolean }) {
   return (
-    <span className="flex h-7 items-center gap-[3px]" aria-hidden="true">
+    <span className={`flex h-7 items-center gap-[3px] ${animated ? 'cotali-flow-wave' : ''}`} aria-hidden="true">
       <i className="block h-[10px] w-0.5 rounded-full bg-cotali-white/75" />
       <i className="block h-[17px] w-0.5 rounded-full bg-cotali-white/75" />
       <i className="block h-6 w-0.5 rounded-full bg-cotali-white/75" />

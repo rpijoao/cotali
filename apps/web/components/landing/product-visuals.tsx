@@ -4,9 +4,7 @@ const tinyLabel = 'text-[9px] font-bold uppercase tracking-[0.1em]';
 
 export function QuotePreview({ compact = false }: { compact?: boolean }) {
   return (
-    <div
-      className={`relative overflow-hidden rounded-[18px] bg-cotali-cloud text-cotali-blue shadow-cotali-card ring-1 ring-cotali-ink/5 ${compact ? 'p-4' : 'p-5'}`}
-    >
+    <div className={`cotali-quote-card relative overflow-hidden rounded-[18px] bg-cotali-cloud text-cotali-blue shadow-cotali-card ring-1 ring-cotali-ink/5 ${compact ? 'p-4' : 'p-5'}`}>
       <div className="flex items-center justify-between border-b border-cotali-blue/10 pb-3">
         <span className={`${tinyLabel} text-cotali-blue/55`}>
           proposta / exemplo
@@ -45,7 +43,7 @@ export function QuotePreview({ compact = false }: { compact?: boolean }) {
   );
 }
 
-export function VoiceCapture({ compact = false }: { compact?: boolean }) {
+export function VoiceCapture({ compact = false, animated = false }: { compact?: boolean; animated?: boolean }) {
   return (
     <div
       className={`rounded-[18px] border border-cotali-white/15 bg-cotali-ink text-cotali-white shadow-cotali-card ${compact ? 'p-4' : 'p-5'}`}
@@ -70,10 +68,8 @@ export function VoiceCapture({ compact = false }: { compact?: boolean }) {
         </div>
       </div>
       <div className="mt-5 flex items-center justify-between border-t border-cotali-white/15 pt-4">
-        <AudioBars />
-        <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-cotali-white/60">
-          voz natural
-        </span>
+        <AudioBars animated={animated} />
+        <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-cotali-white/60">voz natural</span>
       </div>
     </div>
   );
@@ -140,7 +136,7 @@ export function PhoneMockup() {
 
 export function ReviewPreview() {
   return (
-    <div className="relative rounded-[22px] bg-cotali-white p-5 text-cotali-blue shadow-cotali-card ring-1 ring-cotali-ink/5">
+    <div className="cotali-review-card relative rounded-[22px] bg-cotali-white p-5 text-cotali-blue shadow-cotali-card ring-1 ring-cotali-ink/5">
       <div className="flex items-center justify-between border-b border-cotali-blue/10 pb-4">
         <span className={`${tinyLabel} text-cotali-blue/55`}>
           revisão / exemplo
@@ -176,69 +172,37 @@ export function ReviewPreview() {
         <div className="grid size-8 place-items-center rounded-full bg-cotali-blue text-cotali-white">
           <CheckIcon />
         </div>
+       </div>
       </div>
-    </div>
   );
 }
 
 export function WhatsappPreview() {
   return (
-    <div className="overflow-hidden rounded-[22px] border border-[#075e54]/15 bg-[#eef7f1] text-[#173b36] shadow-cotali-card">
+    <div className="cotali-share-card overflow-hidden rounded-[22px] border border-[#075e54]/15 bg-[#eef7f1] text-[#173b36] shadow-cotali-card">
       <div className="flex items-center gap-3 bg-[#075e54] px-5 py-4 text-cotali-white">
-        <div className="grid size-9 place-items-center rounded-full bg-cotali-white/20 text-xs font-bold">
-          MA
-        </div>
-        <div className="min-w-0">
-          <p className="text-sm font-bold">Mariana Alves</p>
-          <span className="text-[10px] text-cotali-white/70">online</span>
-        </div>
-        <div
-          className="ml-auto flex items-center gap-4 text-lg leading-none text-cotali-white/75"
-          aria-hidden="true"
-        >
-          <span>⌕</span>
-          <span>⋮</span>
-        </div>
+        <span className="text-2xl font-light leading-none" aria-hidden="true">‹</span>
+        <div className="grid size-9 place-items-center rounded-full bg-cotali-white/20 text-xs font-bold">MA</div>
+        <div className="min-w-0"><p className="text-sm font-bold">Mariana Alves</p><span className="text-[10px] text-cotali-white/70">online</span></div>
+        <div className="ml-auto flex items-center gap-4 text-lg leading-none text-cotali-white/75" aria-hidden="true"><span>⌕</span><span>⋮</span></div>
       </div>
       <div className="bg-[#edf7f0] px-4 py-5">
-        <div className="mx-auto mb-5 w-fit rounded-full bg-cotali-white/75 px-3 py-1 text-[9px] font-bold uppercase tracking-[0.08em] text-[#53736a]">
-          hoje
-        </div>
-        <div className="max-w-[270px] rounded-2xl rounded-tl-sm bg-cotali-white px-3 py-2.5 text-[11px] leading-[1.45] shadow-sm">
-          Oi! Você consegue me enviar o orçamento do serviço?
-          <span className="mt-1 block text-right text-[9px] text-[#557268]">
-            10:40
-          </span>
-        </div>
-        <div className="ml-auto mt-3 max-w-[250px] rounded-2xl rounded-tr-sm bg-[#d9fdd3] px-3 py-2.5 text-[11px] leading-[1.45] shadow-sm">
-          Claro, Mariana. Segue a proposta para o serviço combinado.
-          <span className="mt-1 block text-right text-[9px] text-[#557268]">
-            10:41 ✓✓
-          </span>
-        </div>
-        <div className="ml-auto mt-3 flex max-w-[270px] items-center gap-3 rounded-xl rounded-tr-sm bg-[#d9fdd3] p-3 shadow-sm">
-          <div className="grid size-9 place-items-center rounded-lg bg-cotali-white/70 text-[10px] font-bold text-[#075e54]">
-            PDF
-          </div>
-          <div>
-            <p className="text-xs font-bold">proposta-cotali.pdf</p>
-            <span className="text-[10px] text-[#53736a]">
-              pronta para compartilhar
-            </span>
-          </div>
-        </div>
+        <div className="mx-auto mb-5 w-fit rounded-full bg-cotali-white/75 px-3 py-1 text-[9px] font-bold uppercase tracking-[0.08em] text-[#53736a]">hoje</div>
+        <div className="max-w-[270px] rounded-2xl rounded-tl-sm bg-cotali-white px-3 py-2.5 text-[11px] leading-[1.45] shadow-sm">Oi! Você consegue me enviar o orçamento do serviço?<span className="mt-1 block text-right text-[9px] text-[#557268]">10:40</span></div>
+        <div className="ml-auto mt-3 max-w-[250px] rounded-2xl rounded-tr-sm bg-[#d9fdd3] px-3 py-2.5 text-[11px] leading-[1.45] shadow-sm">Claro, Mariana. Segue a proposta para o serviço combinado.<span className="mt-1 block text-right text-[9px] text-[#557268]">10:41 ✓✓</span></div>
+        <div className="ml-auto mt-3 flex max-w-[270px] items-center gap-3 rounded-xl rounded-tr-sm bg-[#d9fdd3] p-3 shadow-sm"><div className="grid size-9 place-items-center rounded-lg bg-cotali-white/70 text-[10px] font-bold text-[#075e54]">PDF</div><div><p className="text-xs font-bold">Proposta-Mariana-Alves.pdf</p><span className="text-[10px] text-[#53736a]">pronta para compartilhar</span></div></div>
+       </div>
+       <div className="flex items-center gap-2 bg-[#f0f4f2] px-3 py-3">
+         <div className="flex-1 rounded-full bg-cotali-white px-4 py-2 text-[10px] text-[#6d8980]">
+           Mensagem
+         </div>
+         <span
+           className="grid size-8 place-items-center rounded-full bg-[#075e54] text-xs text-cotali-white"
+           aria-hidden="true"
+         >
+           ➤
+         </span>
+       </div>
       </div>
-      <div className="flex items-center gap-2 bg-[#f0f4f2] px-3 py-3">
-        <div className="flex-1 rounded-full bg-cotali-white px-4 py-2 text-[10px] text-[#6d8980]">
-          Mensagem
-        </div>
-        <span
-          className="grid size-8 place-items-center rounded-full bg-[#075e54] text-xs text-cotali-white"
-          aria-hidden="true"
-        >
-          ➤
-        </span>
-      </div>
-    </div>
   );
 }
