@@ -53,6 +53,8 @@ revisão.
 - A migration `20260906000500_normalize_consent_value_timestamps` corrige o drift
   entre o schema Prisma e as tabelas `consent_records`/`value_events`, interpretando
   os valores legados sem fuso como UTC; o teste de catálogo passou a cobrir 14 colunas.
+- O baseline global do Prettier foi normalizado; `format:check` agora passa em todos
+  os arquivos rastreados e o gate permanece ativo na CI.
 
 O desenho do auth está documentado e o primeiro corte está implementado. A base
 passa typecheck, lint, testes, build e auditoria de dependências no checkout local.
@@ -75,11 +77,9 @@ ambiente e controles de operação, privacidade e resposta a incidentes.
    separados dos logs de segurança.
 6. Definir gestão/rotação de segredos, backup/restore, incidentes, RTO/RPO e acesso
    administrativo, com evidências de execução.
-7. Fazer a CI ficar verde: o `format:check` atual do repositório ainda falha em
-   arquivos preexistentes, embora os arquivos novos do auth estejam formatados.
-8. Executar a CI remota com os testes de integração de auditoria, timestamps e
+7. Executar a CI remota com os testes de integração de auditoria, timestamps e
    rate limit habilitados; a configuração local já inclui esses testes.
-9. Repetir em homologação a comprovação de timestamps UTC das tabelas gerenciadas
+8. Repetir em homologação a comprovação de timestamps UTC das tabelas gerenciadas
    pelo Better Auth e das tabelas de consentimento/eventos; a branch `development`
    deve ser validada com `prisma migrate diff` e o teste de catálogo.
 
@@ -375,7 +375,7 @@ Definir e testar:
 | `corepack pnpm test`                                      | aprovado; 12 tarefas, 42 testes mobile, 43 testes API; integrações PostgreSQL opt-in ignoradas sem habilitação                                                                    | executar na raiz; habilitar integração separadamente                                      |
 | `corepack pnpm build`                                     | aprovado; API, web, mobile Android e worker                                                                                                                                       | executar na raiz                                                                          |
 | Prettier nos arquivos novos/alterados do auth             | aprovado                                                                                                                                                                          | comando específico documentado no handoff                                                 |
-| `corepack pnpm format:check`                              | reprovado no estado global; 105 arquivos preexistentes fora do padrão                                                                                                             | corrigir baseline antes de usar CI como gate verde                                        |
+| `corepack pnpm format:check`                              | aprovado; todos os arquivos rastreados usam o padrão configurado                                                                                                                  | manter o gate ativo na CI                                                                 |
 | configuração dos testes PostgreSQL de segurança na CI     | workflow executa auditoria append-only, timestamps e rate limit com `RUN_DATABASE_INTEGRATION=true`; URL remota ainda pendente                                                    | executar push/PR e anexar artefato redigido                                               |
 | política de cookie web                                    | 9 testes locais cobrem `Secure`, `HttpOnly`, `Path`, `SameSite`, HTTPS obrigatório e rejeição de `none` sem HTTPS                                                                 | repetir em homologação com domínio real e HTTPS                                           |
 | `git diff --check`                                        | sem erro de whitespace; Git emitiu avisos de LF/CRLF                                                                                                                              | executar na raiz                                                                          |
