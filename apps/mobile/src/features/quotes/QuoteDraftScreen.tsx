@@ -47,6 +47,7 @@ import {
   VoiceCaptureCard,
   type CapturedRecording,
 } from '../voice/VoiceCaptureCard';
+import { missingQuantityMessage } from './quote-validation';
 
 const emptyLine = (): EditableQuoteLine => ({
   description: '',
@@ -245,6 +246,18 @@ export function QuoteDraftScreen({
         )
       ) {
         throw new Error('Preencha a descrição de todas as linhas.');
+      }
+      const missingServiceQuantity = missingQuantityMessage(
+        'services',
+        services,
+      );
+      const missingMaterialQuantity = missingQuantityMessage(
+        'materials',
+        materials,
+      );
+      const missingQuantity = missingServiceQuantity ?? missingMaterialQuantity;
+      if (missingQuantity !== null) {
+        throw new Error(missingQuantity);
       }
       if ([...services, ...materials].some((line) => line.unitPrice === '')) {
         throw new Error('Informe os preços antes de revisar o orçamento.');

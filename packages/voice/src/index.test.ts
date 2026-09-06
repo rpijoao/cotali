@@ -64,4 +64,28 @@ describe('voice interpretation validation', () => {
       Value.Check(VoiceQuoteEditInterpretationSchema, interpretation),
     ).toBe(true);
   });
+
+  it('accepts a quantity expressed in hundredths in an edit command', () => {
+    expect(
+      Value.Check(VoiceQuoteEditInterpretationSchema, {
+        id: '73070f7c-a464-47d7-90bf-b06ac2ce7a1e',
+        transcript: 'Altere a quantidade para zero vírgula zero oito.',
+        command: {
+          ambiguities: [],
+          changes: {
+            clientName: null,
+            description: null,
+            quantity: '0.08',
+            unit: null,
+            unitPriceInCents: null,
+          },
+          index: 0,
+          intent: 'update_line',
+          section: 'materials',
+        },
+        source: 'command',
+        createdAt: '2026-09-03T00:00:00.000Z',
+      }),
+    ).toBe(true);
+  });
 });

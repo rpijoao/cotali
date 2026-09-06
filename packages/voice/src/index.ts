@@ -154,7 +154,7 @@ const editCommandSchema = {
         quantity: {
           type: ['string', 'null'],
           pattern:
-            '^(?:0\\.(?:00[1-9]|0[1-9]\\d|[1-9]\\d{0,2})|[1-9]\\d*(?:\\.\\d{1,3})?)$',
+            '^(?:0\\.(?:00[1-9]|0[1-9]\\d?|[1-9]\\d{0,2})|[1-9]\\d*(?:\\.\\d{1,3})?)$',
         },
         unit: { type: ['string', 'null'], minLength: 1, maxLength: 20 },
         unitPriceInCents: { type: ['integer', 'null'], minimum: 0 },
