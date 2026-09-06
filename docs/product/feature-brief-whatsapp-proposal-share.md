@@ -6,7 +6,7 @@
 - **Tipo:** feature e fluxo
 - **Responsável:** Produto e engenharia Cotali
 - **Data:** 2026-09-05
-- **Status:** em validação
+- **Status:** validado
 - **Princípios relacionados:** problema antes da feature; mecanismo demonstrável; uma ação principal por momento; PDF e WhatsApp devem comunicar o estado real do envio
 
 ## Usuário e contexto
@@ -24,7 +24,7 @@
 - **Mecanismo do Cotali:** o app baixa o PDF autenticado do backend e usa o compartilhamento nativo. No Android, o adaptador direciona para o WhatsApp quando há telefone normalizado; sem telefone válido, abre a folha de compartilhamento para o usuário escolher a conversa manualmente. No iOS, o PDF e a mensagem são entregues à folha nativa para o usuário escolher o WhatsApp.
 - **Promessa ao usuário:** “Prepare a proposta para enviar pelo WhatsApp.”
 - **O que não será prometido:** confirmação de entrega, leitura ou envio efetivo da mensagem; no iPhone, não será prometido direcionamento automático da conversa com PDF anexado.
-- **Evidência disponível:** o compartilhamento genérico de PDF foi testado no Pixel 6 e no iPhone 13. O envio direcionado com a biblioteca nativa ainda depende de teste em development build Android.
+- **Evidência disponível:** o compartilhamento genérico de PDF foi testado no Pixel 6 e no iPhone 13. A validação manual também confirmou o fluxo com telefone válido, os fallbacks sem telefone ou com WhatsApp indisponível e o cancelamento sem falso sucesso.
 
 ## Experiência
 
@@ -70,7 +70,7 @@
 - **Baseline:** compartilhamento genérico já validado manualmente; não há métrica quantitativa de uso.
 - **Meta ou critério de decisão:** o Android deve abrir o WhatsApp com PDF e mensagem no número de teste; sem telefone, deve abrir o compartilhamento manual sem bloquear o PDF; o iOS deve mostrar PDF e mensagem na folha nativa; falhas devem levar ao fallback sem perda do arquivo.
 - **Como testar:** development build no Pixel 6 e no iPhone 13, com número fictício, WhatsApp instalado e casos sem telefone.
-- **Quando revisar:** após o primeiro teste real em cada plataforma.
+- **Quando revisar:** após os primeiros usos reais ou se houver falha de anexo, fallback, cancelamento ou estado comunicado ao usuário.
 
 ## Decisão
 

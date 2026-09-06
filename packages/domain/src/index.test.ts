@@ -61,6 +61,17 @@ describe('quote totals', () => {
     ).toBe(101);
   });
 
+  it('accepts fractional quantities expressed in hundredths', () => {
+    expect(
+      calculateLineTotalInCents({
+        description: 'Cabo',
+        quantity: '0.08',
+        unit: 'm',
+        unitPriceInCents: 100,
+      }),
+    ).toBe(8);
+  });
+
   it('keeps unpriced draft lines out of draft totals', () => {
     expect(
       calculateLineTotalInCents({

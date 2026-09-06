@@ -11,7 +11,7 @@ export const QuoteLineInputSchema = Type.Object(
     description: Type.String({ minLength: 1, maxLength: 160 }),
     quantity: Type.String({
       pattern:
-        '^(?:0\\.(?:00[1-9]|0[1-9]\\d|[1-9]\\d{0,2})|[1-9]\\d*(?:\\.\\d{1,3})?)$',
+        '^(?:0\\.(?:00[1-9]|0[1-9]\\d?|[1-9]\\d{0,2})|[1-9]\\d*(?:\\.\\d{1,3})?)$',
     }),
     unit: Type.Union([
       Type.String({ minLength: 1, maxLength: 20 }),
@@ -332,7 +332,7 @@ const VoiceQuoteEditChangesSchema = Type.Object(
     quantity: Type.Union([
       Type.String({
         pattern:
-          '^(?:0\\.(?:00[1-9]|0[1-9]\\d|[1-9]\\d{0,2})|[1-9]\\d*(?:\\.\\d{1,3})?)$',
+          '^(?:0\\.(?:00[1-9]|0[1-9]\\d?|[1-9]\\d{0,2})|[1-9]\\d*(?:\\.\\d{1,3})?)$',
       }),
       Type.Null(),
     ]),

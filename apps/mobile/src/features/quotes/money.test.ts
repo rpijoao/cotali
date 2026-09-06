@@ -4,6 +4,7 @@ import { formatBrl, parseBrlInput } from './money';
 describe('BRL input', () => {
   it('parses formatted input as integer cents', () => {
     expect(parseBrlInput('R$ 1.234,56')).toBe(123456);
+    expect(parseBrlInput('0,08')).toBe(8);
   });
 
   it('formats integer cents for review', () => {
