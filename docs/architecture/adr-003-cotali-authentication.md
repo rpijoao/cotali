@@ -172,6 +172,7 @@ As tabelas são versionadas em:
 - `20260906000300_add_security_audit_events`;
 - `20260906000400_normalize_auth_timestamps`;
 - `20260906000500_normalize_consent_value_timestamps`.
+- `20260906000600_align_auth_account_index_name`.
 
 O ambiente local deste checkout não possui PostgreSQL ouvindo em `localhost:5432`.
 As cinco migrations relacionadas ao auth e aos dados de consentimento/eventos foram
@@ -237,6 +238,9 @@ Evidência técnica adicionada no commit `5ac36a5`: a integração PostgreSQL co
 ciclo de vida do email OTP (hash, expiração, tentativas, rotação e uso único) e o
 isolamento entre dois `authSubject`s nas consultas de quotes. Essa evidência não
 substitui a homologação com Google, Apple e Resend reais nem os testes web/mobile.
+A migration `20260906000600_align_auth_account_index_name` corrige o drift do nome
+do índice de `auth_accounts`; a CI remota `34067260618` aprovou o `migrate diff` e
+a migration foi aplicada na branch Neon `development`.
 
 ## Referências
 
