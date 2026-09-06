@@ -24,14 +24,16 @@ const expectedColumns = [
   ['auth_verifications', 'expires_at'],
   ['auth_verifications', 'created_at'],
   ['auth_verifications', 'updated_at'],
+  ['consent_records', 'created_at'],
+  ['value_events', 'occurred_at'],
 ] as const;
 
-run('Better Auth timestamp schema', () => {
-  it('stores auth instants as PostgreSQL timestamptz', async () => {
+run('Timestamp schema', () => {
+  it('stores auth and product instants as PostgreSQL timestamptz(3)', async () => {
     if (!prisma) throw new Error('A database URL is required.');
 
     const columns = (await prisma.$queryRaw`
-      SELECT table_name, column_name, data_type, udt_name
+      SELECT table_name, column_name, data_type, udt_name, datetime_precision
       FROM information_schema.columns
       WHERE table_schema = 'public'
         AND (table_name, column_name) IN (
@@ -46,7 +48,9 @@ run('Better Auth timestamp schema', () => {
           ('auth_accounts', 'updated_at'),
           ('auth_verifications', 'expires_at'),
           ('auth_verifications', 'created_at'),
-          ('auth_verifications', 'updated_at')
+          ('auth_verifications', 'updated_at'),
+          ('consent_records', 'created_at'),
+          ('value_events', 'occurred_at')
         )
       ORDER BY table_name, column_name
     `) as Array<{
@@ -54,14 +58,25 @@ run('Better Auth timestamp schema', () => {
       column_name: string;
       data_type: string;
       udt_name: string;
+      datetime_precision: number;
     }>;
 
     expect(columns).toHaveLength(expectedColumns.length);
     expect(
+      columns
+        .map(({ table_name, column_name }) => `${table_name}.${column_name}`)
+        .sort(),
+    ).toEqual(
+      expectedColumns
+        .map(([table_name, column_name]) => `${table_name}.${column_name}`)
+        .sort(),
+    );
+    expect(
       columns.every(
         (column) =>
           column.data_type === 'timestamp with time zone' &&
-          column.udt_name === 'timestamptz',
+          column.udt_name === 'timestamptz' &&
+          column.datetime_precision === 3,
       ),
     ).toBe(true);
 

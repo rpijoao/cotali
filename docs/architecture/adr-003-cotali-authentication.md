@@ -170,17 +170,24 @@ As tabelas são versionadas em:
 - `20260906000100_add_better_auth`;
 - `20260906000200_add_consent_and_value_events`;
 - `20260906000300_add_security_audit_events`;
-- `20260906000400_normalize_auth_timestamps`.
+- `20260906000400_normalize_auth_timestamps`;
+- `20260906000500_normalize_consent_value_timestamps`.
 
 O ambiente local deste checkout não possui PostgreSQL ouvindo em `localhost:5432`.
-As quatro migrations específicas do auth foram aplicadas e verificadas na branch Neon
-`cotali/development`; a quarta converte as colunas temporais legadas sem fuso
-interpretando seus valores como UTC. Aplicar em homologação com:
+As cinco migrations relacionadas ao auth e aos dados de consentimento/eventos foram
+aplicadas e verificadas na branch Neon `cotali/development`; as migrations 004 e 005
+convertem as colunas temporais legadas sem fuso interpretando seus valores como UTC.
+Aplicar em homologação com:
 
 ```powershell
 corepack pnpm --filter @cotali/database db:migrate:deploy
 corepack pnpm --filter @cotali/database db:generate
+corepack pnpm --filter @cotali/database exec prisma migrate diff --from-migrations prisma/migrations --to-schema-datamodel prisma/schema.prisma --shadow-database-url $env:PRISMA_MIGRATE_SHADOW_DATABASE_URL --exit-code
 ```
+
+`PRISMA_MIGRATE_SHADOW_DATABASE_URL` deve apontar para um banco vazio e isolado;
+o comando aplica as migrations nesse banco temporário para comparar o resultado
+com o schema Prisma.
 
 ## Consequências
 
@@ -207,8 +214,9 @@ corepack pnpm --filter @cotali/database db:generate
 
 ## Validação antes de produção
 
-1. Repetir as migrations do domínio e do auth em uma branch de homologação e verificar as
-   colunas temporais do Better Auth como `TIMESTAMPTZ(3)`.
+1. Repetir as migrations do domínio e do auth em uma branch de homologação, executar
+   `prisma migrate diff` e verificar as colunas temporais do Better Auth e do produto
+   como `TIMESTAMPTZ(3)`.
 2. Testar OTP expirado, código usado, cinco tentativas, rotação, enumeração para
    email existente/novo, entrada inválida, limite atingido e concorrência,
    sempre com respostas e logs genéricos.

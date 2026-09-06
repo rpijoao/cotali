@@ -67,6 +67,17 @@ jobs:
       - name: Apply migrations to a clean database
         run: pnpm --filter @cotali/database db:migrate:deploy
 
+      - name: Create Prisma shadow database
+        run: psql "$DATABASE_URL" -c 'CREATE DATABASE cotali_shadow;'
+
+      - name: Check Prisma migration and schema drift
+        run: >-
+          pnpm --filter @cotali/database exec prisma migrate diff
+          --from-migrations prisma/migrations
+          --to-schema-datamodel prisma/schema.prisma
+          --shadow-database-url postgresql://cotali:cotali@localhost:5432/cotali_shadow?schema=public
+          --exit-code
+
       - name: Build API dependency graph for integration
         run: pnpm --filter @cotali/api... build
 

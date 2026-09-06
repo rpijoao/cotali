@@ -5,7 +5,7 @@
 - **Status:** pré-auditoria técnica; não é certificação nem aprovação para produção
 - **Escopo:** Better Auth, OTP por email, Google, Apple, sessões, Fastify, web,
   mobile, Resend, consentimento e eventos de valor
-- **Revisão de código:** `46437d7` — correções técnicas desta reauditoria
+- **Revisão de código:** `609a939` — correção do drift de timestamps do auth/produto
 - **Responsável técnico:** produto/engenharia Cotali — preencher responsável nominal
 - **Responsável por privacidade:** preencher antes de publicação
 - **Próxima revisão:** antes do primeiro ambiente de produção e a cada mudança de
@@ -50,6 +50,9 @@ revisão.
   `PRIVACY_POLICY_VERSION` agora é obrigatória sem fallback silencioso.
 - A CI passou a executar os três testes de integração PostgreSQL de segurança,
   além do teste de quotes existente.
+- A migration `20260906000500_normalize_consent_value_timestamps` corrige o drift
+  entre o schema Prisma e as tabelas `consent_records`/`value_events`, interpretando
+  os valores legados sem fuso como UTC; o teste de catálogo passou a cobrir 14 colunas.
 
 O desenho do auth está documentado e o primeiro corte está implementado. A base
 passa typecheck, lint, testes, build e auditoria de dependências no checkout local.
@@ -77,7 +80,8 @@ ambiente e controles de operação, privacidade e resposta a incidentes.
 8. Executar a CI remota com os testes de integração de auditoria, timestamps e
    rate limit habilitados; a configuração local já inclui esses testes.
 9. Repetir em homologação a comprovação de timestamps UTC das tabelas gerenciadas
-   pelo Better Auth; a branch `development` já usa `TIMESTAMPTZ(3)` e foi validada.
+   pelo Better Auth e das tabelas de consentimento/eventos; a branch `development`
+   deve ser validada com `prisma migrate diff` e o teste de catálogo.
 
 ## 2. Referências normativas e técnicas
 
@@ -218,9 +222,9 @@ Os únicos eventos de valor aceitos hoje são `QUOTE_CREATED`, `QUOTE_UPDATED` e
 
 ### Controle adicional de tempo
 
-| ID         | Controle                    | Situação atual                                                                                                                                                                                | Status                              | Ação de fechamento                                                |
-| ---------- | --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- | ----------------------------------------------------------------- |
-| `AUTH-016` | Instantes auditáveis em UTC | schema usa `@db.Timestamptz(3)` nas 12 colunas temporais do Better Auth; migration converte valores legados interpretando-os como UTC; teste consulta `information_schema` no PostgreSQL real | `IMPLEMENTADO — EVIDÊNCIA PENDENTE` | repetir em homologação e anexar evidência de dados legados/backup |
+| ID         | Controle                    | Situação atual                                                                                                                                                                                                                              | Status                              | Ação de fechamento                                                                        |
+| ---------- | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- | ----------------------------------------------------------------------------------------- |
+| `AUTH-016` | Instantes auditáveis em UTC | schema usa `@db.Timestamptz(3)` nas 14 colunas temporais do Better Auth e do produto; migrations 004/005 convertem valores legados interpretando-os como UTC; teste consulta `information_schema` e `datetime_precision` no PostgreSQL real | `IMPLEMENTADO — EVIDÊNCIA PENDENTE` | repetir em homologação e anexar `prisma migrate diff` e evidência de dados legados/backup |
 
 ## 7. Matriz de privacidade e marketing
 
@@ -363,26 +367,27 @@ Definir e testar:
 
 ## 12. Evidências executadas neste snapshot
 
-| Evidência                                                 | Resultado observado                                                                                                            | Reprodutibilidade                                                                         |
-| --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------- |
-| `corepack pnpm audit --audit-level moderate`              | aprovado; nenhum alerta conhecido no snapshot                                                                                  | executar na raiz do checkout                                                              |
-| `corepack pnpm check`                                     | aprovado nos 8 pacotes                                                                                                         | executar na raiz                                                                          |
-| `corepack pnpm lint`                                      | aprovado                                                                                                                       | executar na raiz                                                                          |
-| `corepack pnpm test`                                      | aprovado; 12 tarefas, 42 testes mobile, 43 testes API; integrações PostgreSQL opt-in ignoradas sem habilitação                 | executar na raiz; habilitar integração separadamente                                      |
-| `corepack pnpm build`                                     | aprovado; API, web, mobile Android e worker                                                                                    | executar na raiz                                                                          |
-| Prettier nos arquivos novos/alterados do auth             | aprovado                                                                                                                       | comando específico documentado no handoff                                                 |
-| `corepack pnpm format:check`                              | reprovado no estado global; 105 arquivos preexistentes fora do padrão                                                          | corrigir baseline antes de usar CI como gate verde                                        |
-| configuração dos testes PostgreSQL de segurança na CI     | workflow executa auditoria append-only, timestamps e rate limit com `RUN_DATABASE_INTEGRATION=true`; URL remota ainda pendente | executar push/PR e anexar artefato redigido                                               |
-| política de cookie web                                    | 9 testes locais cobrem `Secure`, `HttpOnly`, `Path`, `SameSite`, HTTPS obrigatório e rejeição de `none` sem HTTPS              | repetir em homologação com domínio real e HTTPS                                           |
-| `git diff --check`                                        | sem erro de whitespace; Git emitiu avisos de LF/CRLF                                                                           | executar na raiz                                                                          |
-| Prisma `generate` e `validate`                            | aprovados                                                                                                                      | executar com `DATABASE_URL` de validação                                                  |
-| migrations Better Auth/consentimento/auditoria/timestamps | oito migrations aplicadas na branch Neon `cotali/development`; `prisma migrate status` confirmou schema atualizado             | repetir em homologação e anexar saída                                                     |
-| teste da trilha de auditoria                              | logout, rate limit e falha de persistência cobertos; trigger testado no PostgreSQL real                                        | anexar execução na CI e manter teste com PostgreSQL                                       |
-| teste anti-enumeração de email OTP                        | email existente/novo, inválido e bloqueado cobertos com Better Auth; nenhum corpo expõe email ou estado da conta               | executar também em homologação                                                            |
-| teste concorrente do limite OTP email+IP                  | 10 requisições simultâneas no Neon development: 3 aceitas, 7 bloqueadas; uma única linha HMAC com contador 3                   | `RUN_DATABASE_INTEGRATION=true` e teste de integração                                     |
-| teste de allowlist OAuth                                  | callback relativo e web configurado aceitos; callback externo rejeitado com 403 sem `Location` antes do Better Auth            | `corepack pnpm --filter @cotali/api exec vitest run src/auth/auth-oauth-redirect.test.ts` |
-| teste de timestamps Better Auth                           | 12 colunas verificadas como `timestamp with time zone`/`timestamptz` no PostgreSQL real                                        | executar também em homologação                                                            |
-| PostgreSQL/Neon development                               | branch `development` pronta; migrations e integração executadas com sucesso                                                    | repetir em homologação/branch efêmera                                                     |
+| Evidência                                                 | Resultado observado                                                                                                                                                               | Reprodutibilidade                                                                         |
+| --------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| `corepack pnpm audit --audit-level moderate`              | aprovado; nenhum alerta conhecido no snapshot                                                                                                                                     | executar na raiz do checkout                                                              |
+| `corepack pnpm check`                                     | aprovado nos 8 pacotes                                                                                                                                                            | executar na raiz                                                                          |
+| `corepack pnpm lint`                                      | aprovado                                                                                                                                                                          | executar na raiz                                                                          |
+| `corepack pnpm test`                                      | aprovado; 12 tarefas, 42 testes mobile, 43 testes API; integrações PostgreSQL opt-in ignoradas sem habilitação                                                                    | executar na raiz; habilitar integração separadamente                                      |
+| `corepack pnpm build`                                     | aprovado; API, web, mobile Android e worker                                                                                                                                       | executar na raiz                                                                          |
+| Prettier nos arquivos novos/alterados do auth             | aprovado                                                                                                                                                                          | comando específico documentado no handoff                                                 |
+| `corepack pnpm format:check`                              | reprovado no estado global; 105 arquivos preexistentes fora do padrão                                                                                                             | corrigir baseline antes de usar CI como gate verde                                        |
+| configuração dos testes PostgreSQL de segurança na CI     | workflow executa auditoria append-only, timestamps e rate limit com `RUN_DATABASE_INTEGRATION=true`; URL remota ainda pendente                                                    | executar push/PR e anexar artefato redigido                                               |
+| política de cookie web                                    | 9 testes locais cobrem `Secure`, `HttpOnly`, `Path`, `SameSite`, HTTPS obrigatório e rejeição de `none` sem HTTPS                                                                 | repetir em homologação com domínio real e HTTPS                                           |
+| `git diff --check`                                        | sem erro de whitespace; Git emitiu avisos de LF/CRLF                                                                                                                              | executar na raiz                                                                          |
+| Prisma `generate` e `validate`                            | aprovados                                                                                                                                                                         | executar com `DATABASE_URL` de validação                                                  |
+| migrations Better Auth/consentimento/auditoria/timestamps | migration 005 aplicada na branch Neon `cotali/development`; `prisma migrate status` confirmou schema atualizado; gate de `prisma migrate diff` adicionado à CI com shadow isolado | repetir em homologação e anexar saída                                                     |
+| teste da trilha de auditoria                              | logout, rate limit e falha de persistência cobertos; trigger testado no PostgreSQL real                                                                                           | anexar execução na CI e manter teste com PostgreSQL                                       |
+| teste anti-enumeração de email OTP                        | email existente/novo, inválido e bloqueado cobertos com Better Auth; nenhum corpo expõe email ou estado da conta                                                                  | executar também em homologação                                                            |
+| teste concorrente do limite OTP email+IP                  | 10 requisições simultâneas no Neon development: 3 aceitas, 7 bloqueadas; uma única linha HMAC com contador 3                                                                      | `RUN_DATABASE_INTEGRATION=true` e teste de integração                                     |
+| teste de allowlist OAuth                                  | callback relativo e web configurado aceitos; callback externo rejeitado com 403 sem `Location` antes do Better Auth                                                               | `corepack pnpm --filter @cotali/api exec vitest run src/auth/auth-oauth-redirect.test.ts` |
+| teste de timestamps auth/produto                          | 14 colunas verificadas como `timestamp with time zone`/`timestamptz` com precisão 3 no PostgreSQL real                                                                            | executar também em homologação                                                            |
+| `prisma migrate diff`                                     | gate configurado na CI com banco shadow isolado; não executado neste checkout por falta de PostgreSQL local/URL shadow                                                            | executar na CI e anexar saída redigida                                                    |
+| PostgreSQL/Neon development                               | branch `development` pronta; migrations e integração executadas com sucesso                                                                                                       | repetir em homologação/branch efêmera                                                     |
 
 ### Comandos de evidência de ambiente
 
@@ -393,6 +398,7 @@ corepack pnpm --filter @cotali/api exec cross-env RUN_DATABASE_INTEGRATION=true 
 corepack pnpm --filter @cotali/api exec cross-env RUN_DATABASE_INTEGRATION=true vitest run src/security/security-audit-service.integration.test.ts
 corepack pnpm --filter @cotali/api exec cross-env RUN_DATABASE_INTEGRATION=true vitest run src/auth/auth-timestamps.integration.test.ts
 corepack pnpm --filter @cotali/api exec cross-env RUN_DATABASE_INTEGRATION=true vitest run src/security/otp-rate-limit-service.integration.test.ts
+corepack pnpm --filter @cotali/database exec prisma migrate diff --from-migrations prisma/migrations --to-schema-datamodel prisma/schema.prisma --shadow-database-url $env:PRISMA_MIGRATE_SHADOW_DATABASE_URL --exit-code
 corepack pnpm --filter @cotali/api exec vitest run src/auth/auth-enumeration.test.ts
 ```
 
@@ -439,15 +445,15 @@ Marcar somente com evidência anexada:
 
 ## 15. Registro de decisões e mudanças
 
-| Data       | Alteração                                                    | Motivo/evidência                                                        | Aprovador |
-| ---------- | ------------------------------------------------------------ | ----------------------------------------------------------------------- | --------- |
-| 2026-09-06 | Better Auth + Resend + Google/Apple/OTP implementados        | ADR-003, código e gates locais                                          | preencher |
-| 2026-09-06 | Consentimento e eventos de valor separados do auth           | ADR-003, schema e rotas                                                 | preencher |
-| 2026-09-06 | Timestamps do Better Auth normalizados para `TIMESTAMPTZ(3)` | migration 004, Prisma validate e teste de catálogo em Neon development  | preencher |
-| 2026-09-06 | Anti-enumeração de email OTP explicitada e testada           | `disableSignUp: false` e cenários de email válido, inválido e bloqueado | preencher |
-| 2026-09-06 | Trilha mínima de segurança adicionada                        | schema, trigger, serviço, handler e testes                              | preencher |
-| 2026-09-06 | Migrations aplicadas na branch Neon development              | `migrate deploy`, status up to date e integração                        | preencher |
-| 2026-09-06 | Pacote de auditoria criado                                   | lacunas de evidência e operação identificadas                           | preencher |
+| Data       | Alteração                                                          | Motivo/evidência                                                                                     | Aprovador |
+| ---------- | ------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------- | --------- |
+| 2026-09-06 | Better Auth + Resend + Google/Apple/OTP implementados              | ADR-003, código e gates locais                                                                       | preencher |
+| 2026-09-06 | Consentimento e eventos de valor separados do auth                 | ADR-003, schema e rotas                                                                              | preencher |
+| 2026-09-06 | Timestamps do auth e do produto normalizados para `TIMESTAMPTZ(3)` | migrations 004/005, `migrate deploy/status`, Prisma validate e teste de catálogo em Neon development | preencher |
+| 2026-09-06 | Anti-enumeração de email OTP explicitada e testada                 | `disableSignUp: false` e cenários de email válido, inválido e bloqueado                              | preencher |
+| 2026-09-06 | Trilha mínima de segurança adicionada                              | schema, trigger, serviço, handler e testes                                                           | preencher |
+| 2026-09-06 | Migrations aplicadas na branch Neon development                    | `migrate deploy`, status up to date e integração                                                     | preencher |
+| 2026-09-06 | Pacote de auditoria criado                                         | lacunas de evidência e operação identificadas                                                        | preencher |
 
 Mudanças futuras em métodos de login, schema, fornecedor, finalidade, evento,
 retenção, base legal, transferência internacional ou fluxo de recuperação exigem
