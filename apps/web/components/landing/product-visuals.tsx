@@ -23,7 +23,7 @@ export function QuotePreview({ compact = false }: { compact?: boolean }) {
   );
 }
 
-export function VoiceCapture({ compact = false }: { compact?: boolean }) {
+export function VoiceCapture({ compact = false, animated = false }: { compact?: boolean; animated?: boolean }) {
   return (
     <div className={`rounded-[18px] border border-cotali-white/15 bg-cotali-ink text-cotali-white shadow-cotali-card ${compact ? 'p-4' : 'p-5'}`}>
       <div className="flex items-center justify-between">
@@ -38,7 +38,7 @@ export function VoiceCapture({ compact = false }: { compact?: boolean }) {
         </div>
       </div>
       <div className="mt-5 flex items-center justify-between border-t border-cotali-white/15 pt-4">
-        <AudioBars />
+        <AudioBars animated={animated} />
         <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-cotali-white/60">voz natural</span>
       </div>
     </div>

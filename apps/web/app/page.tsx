@@ -1,11 +1,11 @@
 import type { ReactNode } from 'react';
 
 import { ArrowUpRight, AudioIcon, CheckIcon, Logo } from '../components/landing/primitives';
+import { FlowVisual } from '../components/landing/flow-visual';
 import {
   PhoneMockup,
   QuotePreview,
   ReviewPreview,
-  VoiceCapture,
   WhatsappPreview,
 } from '../components/landing/product-visuals';
 
@@ -149,20 +149,16 @@ function VoiceToQuoteSection() {
     <section className="bg-cotali-white" id="fluxo">
       <div className={`${container} py-[24px] max-phone:py-0`}>
         <div className="overflow-hidden rounded-tl-[110px] rounded-br-[34px] bg-cotali-sky px-[clamp(34px,6vw,86px)] py-[clamp(56px,6vw,88px)] max-phone:rounded-tl-[58px] max-phone:px-5 max-phone:py-[69px]">
-          <div className="grid grid-cols-[minmax(0,0.82fr)_minmax(0,1.18fr)] items-center gap-[clamp(38px,7vw,105px)] max-tablet:grid-cols-1">
+          <div className="grid grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] items-center gap-[clamp(38px,7vw,105px)] max-tablet:grid-cols-1">
             <div className="max-w-[530px]">
               <SectionTag number="02" label="da voz à proposta" />
-              <h2 className={`${editorialHeading} mt-7 text-[clamp(3.2rem,5.4vw,5.3rem)] text-cotali-blue max-phone:mt-[23px] max-phone:text-[clamp(2.9rem,14vw,4.2rem)]`}>Você explica.<br /><span className="text-cotali-blue/50">O orçamento toma forma.</span></h2>
+              <h2 className={`${editorialHeading} mt-7 max-w-[600px] text-[clamp(3rem,5vw,5rem)] text-cotali-blue max-phone:mt-[23px] max-phone:text-[clamp(2.9rem,14vw,4.2rem)]`}>Você explica.<br /><span className="text-cotali-blue/50">O orçamento<br />toma forma.</span></h2>
               <p className="mt-8 max-w-[480px] text-base tracking-[-0.015em] leading-[1.6] text-cotali-blue/70 max-phone:mt-[25px] max-phone:text-[15px]">O fluxo começa com uma gravação simples e termina em uma proposta que você consegue revisar.</p>
               <div className="mt-[39px]"><ArrowLink href="#controle">entenda o fluxo</ArrowLink></div>
             </div>
 
-            <div className="grid grid-cols-[minmax(0,0.84fr)_minmax(0,1fr)] items-center gap-0 max-tablet:mx-auto max-tablet:w-full max-tablet:max-w-[700px] max-phone:grid-cols-1 max-phone:gap-0">
-              <div className="relative z-10 rotate-[-4deg] max-phone:mx-3 max-phone:rotate-[-2deg]"><VoiceCapture /></div>
-              <div className="relative z-20 -ml-10 rotate-[4deg] max-phone:ml-7 max-phone:mr-1 max-phone:mt-[-18px] max-phone:rotate-[2deg]"><QuotePreview /></div>
-            </div>
+            <FlowVisual />
           </div>
-          <p className="mt-[48px] text-[11px] leading-[1.5] text-cotali-blue/65 max-phone:mt-[39px]">Telas ilustrativas do fluxo. A interpretação é uma sugestão para você revisar.</p>
         </div>
       </div>
     </section>

@@ -48,4 +48,40 @@
       transform: translateY(-8px) rotate(1deg);
     }
   }
+
+}
+
+.cotali-flow-stage {
+  will-change: translate, opacity;
+}
+
+.cotali-flow-scene--scroll-linked .cotali-flow-stage--voice {
+  opacity: calc(0.3 + (var(--cotali-flow-voice-opacity-progress) * 0.7));
+  translate: calc((1 - var(--cotali-flow-voice-progress)) * -64px) calc((1 - var(--cotali-flow-voice-progress)) * 22px);
+}
+
+.cotali-flow-scene--scroll-linked .cotali-flow-stage--quote {
+  opacity: calc(0.3 + (var(--cotali-flow-quote-opacity-progress) * 0.7));
+  translate: calc((1 - var(--cotali-flow-quote-progress)) * 64px) calc((1 - var(--cotali-flow-quote-progress)) * 24px);
+}
+
+.cotali-flow-wave i {
+  transform-origin: center;
+  transition: transform 180ms linear;
+}
+
+.cotali-flow-scene--scroll-linked .cotali-flow-wave i {
+  transform: scaleY(calc(0.78 + (var(--cotali-flow-voice-progress) * 0.22)));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cotali-flow-scene--scroll-linked .cotali-flow-stage {
+    opacity: 1;
+    translate: 0 0;
+  }
+
+  .cotali-flow-wave i {
+    transition: none;
+    transform: none;
+  }
 }
