@@ -330,7 +330,6 @@ function ControlSection() {
           <div className="relative z-10 grid grid-cols-[minmax(0,0.85fr)_minmax(300px,0.75fr)] items-center gap-[clamp(45px,8vw,125px)] max-tablet:grid-cols-1">
             <div className="max-w-[540px]" data-cotali-reveal>
               <SectionTag inverse number="03" label="sua decisão" />
-              <Eyebrow inverse>você continua no controle</Eyebrow>
               <h2 className="mb-7 mt-[26px] font-cotali-display text-[clamp(3.2rem,5vw,5rem)] font-medium tracking-[-0.09em] leading-[0.94] max-phone:mt-[23px] max-phone:text-[clamp(3.1rem,15vw,4.5rem)]">
                 A sugestão aparece.
                 <br />
