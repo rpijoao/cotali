@@ -5,7 +5,7 @@
 - **Status:** pré-auditoria técnica; não é certificação nem aprovação para produção
 - **Escopo:** Better Auth, OTP por email, Google, Apple, sessões, Fastify, web,
   mobile, Resend, consentimento e eventos de valor
-- **Revisão de código:** `609a939` — correção do drift de timestamps do auth/produto
+- **Revisão de código:** `3ee75ab` — correção do drift de timestamps do auth/produto
 - **Responsável técnico:** produto/engenharia Cotali — preencher responsável nominal
 - **Responsável por privacidade:** preencher antes de publicação
 - **Próxima revisão:** antes do primeiro ambiente de produção e a cada mudança de
