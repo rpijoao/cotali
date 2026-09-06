@@ -201,8 +201,8 @@ function HeroSection() {
             </em>
           </h1>
           <p className="mt-7 max-w-[445px] text-[17px] tracking-[-0.015em] leading-[1.55] text-cotali-white/75 max-phone:max-w-[360px] max-phone:text-[15px]">
-            Fale pelo celular o que precisa ser feito. Revise os detalhes e
-            envie um PDF claro para o cliente.
+            Fale pelo celular o que precisa ser feito. O Cotali organiza os
+            detalhes e prepara um PDF claro para o cliente.
           </p>
           <div className="mt-[34px] flex flex-wrap items-center gap-5">
             <a
@@ -211,9 +211,6 @@ function HeroSection() {
             >
               Ver como funciona <ArrowUpRight />
             </a>
-            <ArrowLink href="#controle" inverse>
-              Você continua no controle
-            </ArrowLink>
           </div>
           <StoreButtons />
         </div>
@@ -240,13 +237,13 @@ function OutcomesSection() {
     ],
     [
       'review',
-      'Revise antes de enviar',
-      'Itens, valores e prazos só entram quando estiverem claros para você.',
+      'Detalhes organizados',
+      'Itens, valores e prazos ficam reunidos em uma proposta clara.',
     ],
     [
       'pdf',
       'Compartilhe um PDF',
-      'A proposta fica pronta para você enviar ao cliente quando decidir.',
+      'A proposta fica pronta para compartilhar pelo WhatsApp.',
     ],
   ] as const;
 
@@ -302,7 +299,7 @@ function VoiceToQuoteSection() {
             <div className="max-w-[530px]" data-cotali-reveal>
               <SectionTag number="02" label="da voz à proposta" />
               <h2 className={`${editorialHeading} mt-7 max-w-[600px] text-[clamp(3rem,5vw,5rem)] text-cotali-blue max-phone:mt-[23px] max-phone:text-[clamp(2.9rem,14vw,4.2rem)]`}>Você explica.<br /><span className="text-cotali-blue/50">O orçamento<br />toma forma.</span></h2>
-              <p className="mt-8 max-w-[480px] text-base tracking-[-0.015em] leading-[1.6] text-cotali-blue/70 max-phone:mt-[25px] max-phone:text-[15px]">O fluxo começa com uma gravação simples e termina em uma proposta que você consegue revisar.</p>
+              <p className="mt-8 max-w-[480px] text-base tracking-[-0.015em] leading-[1.6] text-cotali-blue/70 max-phone:mt-[25px] max-phone:text-[15px]">O fluxo começa com uma gravação simples e termina em uma proposta clara para o cliente.</p>
               <div className="mt-[39px]"><ArrowLink href="#controle">entenda o fluxo</ArrowLink></div>
             </div>
 
@@ -386,7 +383,7 @@ function ShareSection() {
                 </span>
               </h2>
               <p className="mt-8 max-w-[500px] text-base tracking-[-0.015em] leading-[1.6] text-cotali-blue/70 max-phone:mt-[25px] max-phone:text-[15px]">
-                Depois da sua revisão, o Cotali prepara o PDF e facilita o
+                Com a proposta pronta, o Cotali prepara o PDF e facilita o
                 compartilhamento pelo WhatsApp.
               </p>
               <div className="mt-[51px] flex flex-wrap items-center gap-x-5 gap-y-4 text-[11px] font-bold uppercase tracking-[0.07em] text-cotali-blue max-phone:grid max-phone:w-full max-phone:grid-cols-[minmax(0,1fr)_auto] max-phone:gap-x-3 max-phone:gap-y-3">
@@ -436,11 +433,11 @@ function QuestionsSection() {
     ],
     [
       'O Cotali inventa preços ou informações?',
-      'Não. O que não estiver claro fica marcado para você confirmar. A proposta só deve ser enviada depois da sua conferência.',
+      'Não. O que não estiver claro fica marcado para completar antes do envio.',
     ],
     [
       'O PDF é enviado sozinho?',
-      'Não. O Cotali prepara o PDF e facilita o envio pelo WhatsApp. Você decide quando compartilhar.',
+      'Não. O Cotali prepara o PDF e facilita o envio pelo WhatsApp.',
     ],
   ];
 
