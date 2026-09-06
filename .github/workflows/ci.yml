@@ -34,6 +34,7 @@ jobs:
       DATABASE_URL: postgresql://cotali:cotali@localhost:5432/cotali?schema=public
       DATABASE_URL_UNPOOLED: postgresql://cotali:cotali@localhost:5432/cotali?schema=public
       TEST_DATABASE_URL: postgresql://cotali:cotali@localhost:5432/cotali?schema=public
+      DATABASE_ADMIN_URL: postgresql://cotali:cotali@localhost:5432/cotali
 
     steps:
       - name: Checkout
@@ -68,7 +69,7 @@ jobs:
         run: pnpm --filter @cotali/database db:migrate:deploy
 
       - name: Create Prisma shadow database
-        run: psql "$DATABASE_URL" -c 'CREATE DATABASE cotali_shadow;'
+        run: psql "$DATABASE_ADMIN_URL" -c 'CREATE DATABASE cotali_shadow;'
 
       - name: Check Prisma migration and schema drift
         run: >-
