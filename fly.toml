@@ -1,0 +1,39 @@
+app = 'cotali-api-staging'
+primary_region = 'gru'
+
+[build]
+  dockerfile = 'Dockerfile'
+
+[env]
+  NODE_ENV = 'production'
+  PORT = '3333'
+  BETTER_AUTH_URL = 'https://cotali-api-staging.fly.dev'
+  WEB_APP_URL = 'https://cotali.com.br'
+  AUTH_COOKIE_SAME_SITE = 'lax'
+  TRUSTED_PROXY_HOPS = '1'
+  AUTH_TRUSTED_ORIGINS = 'https://cotali.com.br,cotali://'
+  CORS_ORIGINS = 'https://cotali.com.br'
+
+[deploy]
+  # Executado pela Fly antes de promover a nova versão.
+  release_command = 'node_modules/.bin/prisma migrate deploy --schema packages/database/prisma/schema.prisma'
+
+[http_service]
+  internal_port = 3333
+  force_https = true
+  auto_stop_machines = 'stop'
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ['app']
+
+  [[http_service.checks]]
+    interval = '15s'
+    timeout = '5s'
+    grace_period = '15s'
+    method = 'GET'
+    path = '/v1/health'
+
+[[vm]]
+  memory = '512mb'
+  cpu_kind = 'shared'
+  cpus = 1
