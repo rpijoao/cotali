@@ -408,10 +408,16 @@ Definir e testar:
   quatro testes de integracao de seguranca e os builds do monorepo.
 - A branch Neon schema-only `homologation-auth` (`br-plain-leaf-accumal2`) foi
   criada em 2026-09-06 a partir do schema de `development`, sem copiar dados, e
-  ficou pronta para homologacao ate 2026-10-06. `migrate deploy` reportou que nao
-  havia migrations pendentes, e os cinco testes PostgreSQL passaram nessa branch:
-  8 testes no total. Essa evidencia cobre a base PostgreSQL e nao substitui os
-  testes com Google, Apple, Resend, HTTPS ou dados de homologacao aprovados.
+  ficou pronta para homologacao ate 2026-10-06. Como uma branch schema-only nao
+  preserva o historico `_prisma_migrations`, a primeira tentativa de deploy foi
+  interrompida antes de alterar dados ao encontrar o enum `QuoteStatus` ja
+  existente. A branch, criada sem dados de usuario, foi resetada de forma
+  controlada e as 10 migrations deste checkout foram reaplicadas do zero.
+- Depois do reset, `migrate deploy` nao encontrou migrations pendentes,
+  `prisma migrate diff` nao encontrou diferencas e os cinco testes PostgreSQL
+  passaram nessa branch: 8 testes no total. Essa evidencia cobre a base
+  PostgreSQL e nao substitui os testes com Google, Apple, Resend, HTTPS ou dados
+  de homologacao aprovados.
 
 ### Comandos de evidência de ambiente
 

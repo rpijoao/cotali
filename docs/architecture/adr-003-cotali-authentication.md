@@ -243,9 +243,14 @@ do índice de `auth_accounts`; a CI remota `34067260618` aprovou o `migrate diff
 a migration foi aplicada na branch Neon `development`.
 Em 2026-09-06, foi criada a branch Neon schema-only `homologation-auth`
 (`br-plain-leaf-accumal2`) a partir do schema de `development`, sem copiar dados.
-O `migrate deploy` não encontrou migrations pendentes e os cinco testes de
-integração PostgreSQL passaram nessa branch, com 8 testes verdes. A branch expira
-em 2026-10-06 e não representa evidência dos provedores externos ou do HTTPS real.
+Como uma branch schema-only não preserva o histórico `_prisma_migrations`, a
+primeira tentativa de `migrate deploy` foi interrompida ao encontrar o enum
+`QuoteStatus` já existente. Como a branch não tinha dados de usuário, foi feito
+um reset controlado e as 10 migrations deste checkout foram reaplicadas do zero.
+Depois disso, `migrate deploy` não encontrou pendências, `prisma migrate diff` não
+encontrou diferenças e os cinco testes de integração PostgreSQL passaram, com 8
+testes verdes. A branch expira em 2026-10-06 e não representa evidência dos
+provedores externos ou do HTTPS real.
 
 ## Referências
 
