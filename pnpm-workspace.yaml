@@ -12,3 +12,5 @@ allowBuilds:
   esbuild: true
   msgpackr-extract: false
   prisma: true
+  sharp: set this to true or false
+  workerd: false
