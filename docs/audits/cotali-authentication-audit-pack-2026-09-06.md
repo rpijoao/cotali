@@ -71,9 +71,9 @@ ambiente e controles de operação, privacidade e resposta a incidentes.
 
 ### Bloqueadores para declarar “aprovado para produção”
 
-1. Repetir em homologação a aplicação das migrations já validadas na branch Neon
-   `development` e guardar o resultado, incluindo rollback ou procedimento de
-   recuperação.
+1. Finalizar a evidência operacional da homologação: guardar a saída redigida do
+   `migrate deploy` na branch `homologation-auth` e executar um restore testado,
+   incluindo rollback ou procedimento de recuperação.
 2. Executar testes reais de OTP, Google e Apple em web, Android e iOS development
    build, com os redirects do ambiente documentados.
 3. Publicar uma política de privacidade aprovada, com controlador, canal de contato,
@@ -85,9 +85,6 @@ ambiente e controles de operação, privacidade e resposta a incidentes.
    separados dos logs de segurança.
 6. Definir gestão/rotação de segredos, backup/restore, incidentes, RTO/RPO e acesso
    administrativo, com evidências de execução.
-7. Repetir em homologação a comprovação de timestamps UTC das tabelas gerenciadas
-   pelo Better Auth e das tabelas de consentimento/eventos; a branch `development`
-   deve ser validada com `prisma migrate diff` e o teste de catálogo.
 
 ## 2. Referências normativas e técnicas
 
@@ -228,9 +225,9 @@ Os únicos eventos de valor aceitos hoje são `QUOTE_CREATED`, `QUOTE_UPDATED` e
 
 ### Controle adicional de tempo
 
-| ID         | Controle                    | Situação atual                                                                                                                                                                                                                              | Status                              | Ação de fechamento                                                                        |
-| ---------- | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- | ----------------------------------------------------------------------------------------- |
-| `AUTH-016` | Instantes auditáveis em UTC | schema usa `@db.Timestamptz(3)` nas 14 colunas temporais do Better Auth e do produto; migrations 004/005 convertem valores legados interpretando-os como UTC; teste consulta `information_schema` e `datetime_precision` no PostgreSQL real | `IMPLEMENTADO — EVIDÊNCIA PENDENTE` | repetir em homologação e anexar `prisma migrate diff` e evidência de dados legados/backup |
+| ID         | Controle                    | Situação atual                                                                                                                                                                                                                              | Status                                         | Ação de fechamento                                                                              |
+| ---------- | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| `AUTH-016` | Instantes auditáveis em UTC | schema usa `@db.Timestamptz(3)` nas 14 colunas temporais do Better Auth e do produto; migrations 004/005 convertem valores legados interpretando-os como UTC; teste consulta `information_schema` e `datetime_precision` no PostgreSQL real | `IMPLEMENTADO — EVIDÊNCIA DE EXECUÇÃO ANEXADA` | repetir com o procedimento de restore em homologação e anexar evidência de dados legados/backup |
 
 ## 7. Matriz de privacidade e marketing
 
@@ -373,27 +370,28 @@ Definir e testar:
 
 ## 12. Evidências executadas neste snapshot
 
-| Evidência                                                 | Resultado observado                                                                                                                                          | Reprodutibilidade                                                                         |
-| --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------- |
-| `corepack pnpm audit --audit-level moderate`              | aprovado; nenhum alerta conhecido no snapshot                                                                                                                | executar na raiz do checkout                                                              |
-| `corepack pnpm check`                                     | aprovado nos 8 pacotes                                                                                                                                       | executar na raiz                                                                          |
-| `corepack pnpm lint`                                      | aprovado                                                                                                                                                     | executar na raiz                                                                          |
-| `corepack pnpm test`                                      | aprovado; 12 tarefas, 42 testes mobile, 43 testes API; integrações PostgreSQL opt-in ignoradas sem habilitação                                               | executar na raiz; habilitar integração separadamente                                      |
-| `corepack pnpm build`                                     | aprovado; API, web, mobile Android e worker                                                                                                                  | executar na raiz                                                                          |
-| Prettier nos arquivos novos/alterados do auth             | aprovado                                                                                                                                                     | comando específico documentado no handoff                                                 |
-| `corepack pnpm format:check`                              | aprovado; todos os arquivos rastreados usam o padrão configurado                                                                                             | manter o gate ativo na CI                                                                 |
-| configuração dos testes PostgreSQL de segurança na CI     | workflow executa lifecycle OTP, isolamento, auditoria append-only, timestamps e rate limit com `RUN_DATABASE_INTEGRATION=true`; execução `34067260618` verde | manter execução remota e anexar artefato redigido                                         |
-| política de cookie web                                    | 9 testes locais cobrem `Secure`, `HttpOnly`, `Path`, `SameSite`, HTTPS obrigatório e rejeição de `none` sem HTTPS                                            | repetir em homologação com domínio real e HTTPS                                           |
-| `git diff --check`                                        | sem erro de whitespace; Git emitiu avisos de LF/CRLF                                                                                                         | executar na raiz                                                                          |
-| Prisma `generate` e `validate`                            | aprovados                                                                                                                                                    | executar com `DATABASE_URL` de validação                                                  |
-| migrations Better Auth/consentimento/auditoria/timestamps | migrations 005/006 aplicadas na branch Neon `cotali/development`; `migrate diff` passou na CI com shadow isolado e confirmou convergência                    | repetir em homologação e anexar saída                                                     |
-| teste da trilha de auditoria                              | logout, rate limit e falha de persistência cobertos; trigger testado no PostgreSQL real                                                                      | anexar execução na CI e manter teste com PostgreSQL                                       |
-| teste anti-enumeração de email OTP                        | email existente/novo, inválido e bloqueado cobertos com Better Auth; nenhum corpo expõe email ou estado da conta                                             | executar também em homologação                                                            |
-| teste concorrente do limite OTP email+IP                  | 10 requisições simultâneas no Neon development: 3 aceitas, 7 bloqueadas; uma única linha HMAC com contador 3                                                 | `RUN_DATABASE_INTEGRATION=true` e teste de integração                                     |
-| teste de allowlist OAuth                                  | callback relativo e web configurado aceitos; callback externo rejeitado com 403 sem `Location` antes do Better Auth                                          | `corepack pnpm --filter @cotali/api exec vitest run src/auth/auth-oauth-redirect.test.ts` |
-| teste de timestamps auth/produto                          | 14 colunas verificadas como `timestamp with time zone`/`timestamptz` com precisão 3 no PostgreSQL real                                                       | executar também em homologação                                                            |
-| `prisma migrate diff`                                     | execução remota `34067260618` aprovada; shadow PostgreSQL criado no job e nenhum drift reportado                                                             | repetir em homologação e anexar saída redigida                                            |
-| PostgreSQL/Neon development                               | branch `development` pronta; migration 006 aplicada com `migrate deploy` e todas as migrations concluídas com sucesso                                        | repetir em homologação/branch efêmera                                                     |
+| Evidência                                                 | Resultado observado                                                                                                                                                                                                  | Reprodutibilidade                                                                         |
+| --------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| `corepack pnpm audit --audit-level moderate`              | aprovado; nenhum alerta conhecido no snapshot                                                                                                                                                                        | executar na raiz do checkout                                                              |
+| `corepack pnpm check`                                     | aprovado nos 8 pacotes                                                                                                                                                                                               | executar na raiz                                                                          |
+| `corepack pnpm lint`                                      | aprovado                                                                                                                                                                                                             | executar na raiz                                                                          |
+| `corepack pnpm test`                                      | aprovado; 12 tarefas, 42 testes mobile, 43 testes API; integrações PostgreSQL opt-in ignoradas sem habilitação                                                                                                       | executar na raiz; habilitar integração separadamente                                      |
+| `corepack pnpm build`                                     | aprovado; API, web, mobile Android e worker                                                                                                                                                                          | executar na raiz                                                                          |
+| Prettier nos arquivos novos/alterados do auth             | aprovado                                                                                                                                                                                                             | comando específico documentado no handoff                                                 |
+| `corepack pnpm format:check`                              | aprovado; todos os arquivos rastreados usam o padrão configurado                                                                                                                                                     | manter o gate ativo na CI                                                                 |
+| configuração dos testes PostgreSQL de segurança na CI     | workflow executa lifecycle OTP, isolamento, auditoria append-only, timestamps e rate limit com `RUN_DATABASE_INTEGRATION=true`; execução `34067260618` verde                                                         | manter execução remota e anexar artefato redigido                                         |
+| política de cookie web                                    | 9 testes locais cobrem `Secure`, `HttpOnly`, `Path`, `SameSite`, HTTPS obrigatório e rejeição de `none` sem HTTPS                                                                                                    | repetir em homologação com domínio real e HTTPS                                           |
+| `git diff --check`                                        | sem erro de whitespace; Git emitiu avisos de LF/CRLF                                                                                                                                                                 | executar na raiz                                                                          |
+| Prisma `generate` e `validate`                            | aprovados                                                                                                                                                                                                            | executar com `DATABASE_URL` de validação                                                  |
+| migrations Better Auth/consentimento/auditoria/timestamps | migrations 005/006 aplicadas na branch Neon `cotali/development`; `migrate deploy` sem pendências na branch schema-only `homologation-auth`; `migrate diff` passou na CI com shadow isolado e confirmou convergência | anexar restore e repetir em homologação com dados aprovados                               |
+| teste da trilha de auditoria                              | logout, rate limit e falha de persistência cobertos; trigger testado no PostgreSQL real                                                                                                                              | anexar execução na CI e manter teste com PostgreSQL                                       |
+| teste anti-enumeração de email OTP                        | email existente/novo, inválido e bloqueado cobertos com Better Auth; nenhum corpo expõe email ou estado da conta                                                                                                     | executar também em homologação                                                            |
+| teste concorrente do limite OTP email+IP                  | 10 requisições simultâneas no Neon development: 3 aceitas, 7 bloqueadas; uma única linha HMAC com contador 3                                                                                                         | `RUN_DATABASE_INTEGRATION=true` e teste de integração                                     |
+| teste de allowlist OAuth                                  | callback relativo e web configurado aceitos; callback externo rejeitado com 403 sem `Location` antes do Better Auth                                                                                                  | `corepack pnpm --filter @cotali/api exec vitest run src/auth/auth-oauth-redirect.test.ts` |
+| teste de timestamps auth/produto                          | 14 colunas verificadas como `timestamp with time zone`/`timestamptz` com precisão 3 no PostgreSQL real; teste executado também em `homologation-auth`                                                                | anexar saída redigida e evidência de restore                                              |
+| `prisma migrate diff`                                     | execução remota `34067260618` aprovada; shadow PostgreSQL criado no job e nenhum drift reportado                                                                                                                     | repetir em homologação e anexar saída redigida                                            |
+| PostgreSQL/Neon development                               | branch `development` pronta; migration 006 aplicada com `migrate deploy` e todas as migrations concluídas com sucesso                                                                                                | manter como base da homologação                                                           |
+| PostgreSQL/Neon homologation-auth                         | branch schema-only `br-plain-leaf-accumal2`, pronta, sem dados copiados; `migrate deploy` sem pendências e 5 arquivos/8 testes PostgreSQL verdes                                                                     | configurar provedores, HTTPS e restore aprovados                                          |
 
 ### Evidencias adicionadas nas revisoes `5ac36a5` e `6085f8b`
 
@@ -408,6 +406,12 @@ Definir e testar:
 - A [execucao remota da CI](https://github.com/rpijoao/cotali/actions/runs/34067260618)
   passou em 2026-09-06 no commit `6085f8b`, incluindo `prisma migrate diff`, os
   quatro testes de integracao de seguranca e os builds do monorepo.
+- A branch Neon schema-only `homologation-auth` (`br-plain-leaf-accumal2`) foi
+  criada em 2026-09-06 a partir do schema de `development`, sem copiar dados, e
+  ficou pronta para homologacao ate 2026-10-06. `migrate deploy` reportou que nao
+  havia migrations pendentes, e os cinco testes PostgreSQL passaram nessa branch:
+  8 testes no total. Essa evidencia cobre a base PostgreSQL e nao substitui os
+  testes com Google, Apple, Resend, HTTPS ou dados de homologacao aprovados.
 
 ### Comandos de evidência de ambiente
 
@@ -429,20 +433,20 @@ hash de commit e evidência mínima necessária.
 
 ## 13. Catálogo de evidências a anexar
 
-| Evidência              | Artefato esperado                                            | Dono                  | Status                                                                                                      |
-| ---------------------- | ------------------------------------------------------------ | --------------------- | ----------------------------------------------------------------------------------------------------------- |
-| versão exata do código | commit/tag e lockfile                                        | engenharia            | `IMPLEMENTADO` — commit técnico `6085f8b`; tag e aprovação formal ainda pendentes                           |
-| schema/migrations      | SQL revisado, saída de deploy e validação                    | engenharia/DBA        | `IMPLEMENTADO — EVIDÊNCIA DE EXECUÇÃO ANEXADA`; homologação e restore ainda pendentes                       |
-| CI                     | URL de execução verde e artefatos                            | engenharia            | `IMPLEMENTADO — EVIDÊNCIA DE EXECUÇÃO ANEXADA` — run `34067260618`; artefatos formais ainda pendentes       |
-| dependências           | `pnpm audit`, lockfile e política de atualização             | engenharia            | `PARCIAL`                                                                                                   |
-| OAuth Google           | client, redirect URIs, projeto e owner; sem secret           | engenharia            | `PENDENTE`                                                                                                  |
-| OAuth Apple            | Services ID, bundle IDs, key owner, redirects e relay        | engenharia            | `PENDENTE`                                                                                                  |
-| Resend                 | domínio autenticado, remetente, eventos e DPA                | operações/privacidade | `PENDENTE`                                                                                                  |
-| testes auth            | matriz OTP/social/sessão/linking/logout                      | QA/engenharia         | `PARCIAL` — OTP e isolamento multi-tenant cobertos localmente; provedores, sessão e linking ainda pendentes |
-| logs                   | amostras redigidas e política de acesso/retencão             | operações             | `PENDENTE`                                                                                                  |
-| backup/restore         | relatório de restauração bem-sucedida                        | operações/DBA         | `PENDENTE`                                                                                                  |
-| privacidade            | política aprovada, registro de tratamento e canal do titular | privacidade/jurídico  | `PENDENTE`                                                                                                  |
-| incidente              | runbook, contatos e simulado                                 | operações             | `PENDENTE`                                                                                                  |
+| Evidência              | Artefato esperado                                            | Dono                  | Status                                                                                                                           |
+| ---------------------- | ------------------------------------------------------------ | --------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| versão exata do código | commit/tag e lockfile                                        | engenharia            | `IMPLEMENTADO` — commit técnico `6085f8b`; tag e aprovação formal ainda pendentes                                                |
+| schema/migrations      | SQL revisado, saída de deploy e validação                    | engenharia/DBA        | `IMPLEMENTADO — EVIDÊNCIA DE EXECUÇÃO ANEXADA`; homologação e restore ainda pendentes                                            |
+| CI                     | URL de execução verde e artefatos                            | engenharia            | `IMPLEMENTADO — EVIDÊNCIA DE EXECUÇÃO ANEXADA` — run `34067260618`; artefatos formais ainda pendentes                            |
+| dependências           | `pnpm audit`, lockfile e política de atualização             | engenharia            | `PARCIAL`                                                                                                                        |
+| OAuth Google           | client, redirect URIs, projeto e owner; sem secret           | engenharia            | `PENDENTE`                                                                                                                       |
+| OAuth Apple            | Services ID, bundle IDs, key owner, redirects e relay        | engenharia            | `PENDENTE`                                                                                                                       |
+| Resend                 | domínio autenticado, remetente, eventos e DPA                | operações/privacidade | `PENDENTE`                                                                                                                       |
+| testes auth            | matriz OTP/social/sessão/linking/logout                      | QA/engenharia         | `PARCIAL` — OTP e isolamento multi-tenant executados também em `homologation-auth`; provedores, sessão e linking ainda pendentes |
+| logs                   | amostras redigidas e política de acesso/retencão             | operações             | `PENDENTE`                                                                                                                       |
+| backup/restore         | relatório de restauração bem-sucedida                        | operações/DBA         | `PENDENTE`                                                                                                                       |
+| privacidade            | política aprovada, registro de tratamento e canal do titular | privacidade/jurídico  | `PENDENTE`                                                                                                                       |
+| incidente              | runbook, contatos e simulado                                 | operações             | `PENDENTE`                                                                                                                       |
 
 ## 14. Gate de liberação para produção
 

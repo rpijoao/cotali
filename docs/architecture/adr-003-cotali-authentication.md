@@ -241,6 +241,11 @@ substitui a homologação com Google, Apple e Resend reais nem os testes web/mob
 A migration `20260906000600_align_auth_account_index_name` corrige o drift do nome
 do índice de `auth_accounts`; a CI remota `34067260618` aprovou o `migrate diff` e
 a migration foi aplicada na branch Neon `development`.
+Em 2026-09-06, foi criada a branch Neon schema-only `homologation-auth`
+(`br-plain-leaf-accumal2`) a partir do schema de `development`, sem copiar dados.
+O `migrate deploy` não encontrou migrations pendentes e os cinco testes de
+integração PostgreSQL passaram nessa branch, com 8 testes verdes. A branch expira
+em 2026-10-06 e não representa evidência dos provedores externos ou do HTTPS real.
 
 ## Referências
 
