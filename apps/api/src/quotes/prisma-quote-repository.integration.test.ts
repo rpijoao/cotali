@@ -14,13 +14,15 @@ const prisma = databaseUrl
   ? new PrismaClient({ datasources: { db: { url: databaseUrl } } })
   : null;
 const subject = `integration:${randomUUID()}`;
+const subjects = new Set([subject]);
 
 afterAll(async () => {
   if (!prisma) return;
-  const account = await prisma.account.findUnique({
-    where: { authSubject: subject },
-  });
-  if (account) {
+  for (const authSubject of subjects) {
+    const account = await prisma.account.findUnique({
+      where: { authSubject },
+    });
+    if (!account) continue;
     await prisma.mutation.deleteMany({ where: { accountId: account.id } });
     await prisma.quote.deleteMany({ where: { accountId: account.id } });
     await prisma.client.deleteMany({ where: { accountId: account.id } });
@@ -127,5 +129,60 @@ run('PrismaQuoteRepository', () => {
     });
     expect(storedUpdated?.currentRevision?.revisionNumber).toBe(2);
     expect(storedUpdated?.totalCents).toBe(30000n);
+  }, 20_000);
+
+  it('does not expose one account quote through another account subject', async () => {
+    if (!prisma) throw new Error('A database URL is required.');
+    const firstSubject = `integration:${randomUUID()}`;
+    const secondSubject = `integration:${randomUUID()}`;
+    subjects.add(firstSubject);
+    subjects.add(secondSubject);
+    const service = new QuoteService(new PrismaQuoteRepository(prisma));
+    const createInput = (name: string) => ({
+      client: { name, phone: null },
+      conditions: {
+        executionDeadline: null,
+        installmentCount: null,
+        notes: null,
+        paymentMethod: 'Pix',
+        paymentPlanType: 'integral' as const,
+        validUntil: null,
+      },
+      discountInCents: 0,
+      materials: [],
+      mutationId: randomUUID(),
+      services: [
+        {
+          description: 'Serviço isolado',
+          quantity: '1',
+          unit: 'un',
+          unitPriceInCents: 1000,
+        },
+      ],
+      source: 'manual' as const,
+    });
+
+    const firstQuote = await service.createDraft(
+      firstSubject,
+      createInput('Cliente da primeira conta'),
+    );
+    const secondQuote = await service.createDraft(
+      secondSubject,
+      createInput('Cliente da segunda conta'),
+    );
+    const repository = new PrismaQuoteRepository(prisma);
+
+    await expect(
+      repository.getById(firstSubject, secondQuote.id),
+    ).resolves.toBeNull();
+    await expect(
+      repository.getById(secondSubject, firstQuote.id),
+    ).resolves.toBeNull();
+    expect(await repository.listRecent(firstSubject, 20)).toEqual([
+      expect.objectContaining({ id: firstQuote.id }),
+    ]);
+    expect(await repository.listRecent(secondSubject, 20)).toEqual([
+      expect.objectContaining({ id: secondQuote.id }),
+    ]);
   }, 20_000);
 });

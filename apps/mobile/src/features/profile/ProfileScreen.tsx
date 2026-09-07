@@ -21,12 +21,16 @@ import {
 } from './profile-api';
 import { saveProfessionalProfile } from './profile-storage';
 
-export function ProfileScreen({ onBack }: Readonly<{ onBack: () => void }>) {
+export function ProfileScreen({
+  onBack,
+  onSignOut,
+}: Readonly<{ onBack: () => void; onSignOut: () => Promise<void> }>) {
   const [profile, setProfile] = useState<LocalProfessionalProfile>(
     EMPTY_PROFESSIONAL_PROFILE,
   );
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -75,6 +79,18 @@ export function ProfileScreen({ onBack }: Readonly<{ onBack: () => void }>) {
       );
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function signOut() {
+    setSigningOut(true);
+    setError(null);
+    try {
+      await onSignOut();
+    } catch {
+      setError('Não foi possível sair da conta. Tente novamente.');
+    } finally {
+      setSigningOut(false);
     }
   }
 
@@ -156,6 +172,18 @@ export function ProfileScreen({ onBack }: Readonly<{ onBack: () => void }>) {
             <ActivityIndicator color="#FFFFFF" />
           ) : (
             <Text style={styles.saveButtonText}>Salvar perfil</Text>
+          )}
+        </Pressable>
+
+        <Pressable
+          disabled={signingOut}
+          onPress={() => void signOut()}
+          style={styles.signOutButton}
+        >
+          {signingOut ? (
+            <ActivityIndicator color="#A33B34" />
+          ) : (
+            <Text style={styles.signOutText}>Sair da conta</Text>
           )}
         </Pressable>
       </ScrollView>
@@ -252,4 +280,11 @@ const styles = StyleSheet.create({
   },
   saveButtonDisabled: { opacity: 0.7 },
   saveButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '800' },
+  signOutButton: {
+    alignItems: 'center',
+    minHeight: 48,
+    justifyContent: 'center',
+    marginTop: 10,
+  },
+  signOutText: { color: '#A33B34', fontSize: 14, fontWeight: '800' },
 });

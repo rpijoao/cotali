@@ -107,7 +107,35 @@ continua usando `expo-sharing`.
 mantém uma cópia local para leitura quando estiver sem conexão, mas a versão
 sincronizada na API/PostgreSQL é a fonte oficial para documentos futuros.
 
-Em desenvolvimento, use `Authorization: Bearer dev:local-user`. Esse modo é recusado quando `NODE_ENV=production`. Em produção, a API exige `OIDC_ISSUER`, `OIDC_AUDIENCE` e `OIDC_JWKS_URL` para validar JWTs assinados pelo provedor escolhido.
+### Autenticação
+
+O Cotali usa Better Auth dentro da API Fastify, com sessões persistidas no
+PostgreSQL. O MVP oferece login por Google, Apple e código de seis dígitos por
+email. Não há senha, SMS ou token artesanal no cliente.
+
+Copie `apps/api/.env.example` para `apps/api/.env` e preencha
+`BETTER_AUTH_SECRET`, as credenciais Google/Apple e o remetente/segredo do
+Resend. A chave do Resend fica somente no backend. Para o web, copie
+`apps/web/.env.example`; no mobile, copie `apps/mobile/.env.example`.
+
+Depois de conectar o PostgreSQL, aplique as migrations e gere o client Prisma:
+
+```powershell
+corepack pnpm --filter @cotali/database db:migrate:deploy
+corepack pnpm --filter @cotali/database db:generate
+```
+
+Os detalhes de identidade, sessões, redirects OAuth, OTP, consentimento e
+eventos de valor estão no [ADR-003](./docs/architecture/adr-003-cotali-authentication.md)
+e no [briefing da feature](./docs/product/feature-brief-authentication.md). Para
+auditoria, use o [pacote de controles e evidências](./docs/audits/cotali-authentication-audit-pack-2026-09-06.md)
+e a [minuta técnica de privacidade](./docs/privacy/cotali-privacy-notice-draft-2026-09-06.md).
+
+Para desenvolvimento sem credenciais sociais, use o OTP com um domínio de
+envio válido no Resend. A API continua usando a mesma sessão Better Auth.
+Para testes locais de módulos legados, o bearer `dev:*` de teste só é aceito quando `AUTH_MODE=development` e
+`NODE_ENV` não é `production`; esse caminho é rejeitado pelo servidor em
+produção.
 
 O teste do adaptador PostgreSQL real é habilitado explicitamente com `RUN_DATABASE_INTEGRATION=true`. Ele usa `TEST_DATABASE_URL` quando definida e, caso contrário, a `DATABASE_URL` de `apps/api/.env`.
 

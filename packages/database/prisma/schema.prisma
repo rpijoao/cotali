@@ -39,22 +39,181 @@ enum VoiceJobStatus {
   FAILED
 }
 
+enum ConsentPurpose {
+  MARKETING_EMAIL
+}
+
+enum ConsentChannel {
+  WEB
+  MOBILE
+}
+
+enum ValueEventName {
+  QUOTE_CREATED
+  QUOTE_UPDATED
+  QUOTE_SHARED
+}
+
+enum SecurityAuditEventName {
+  AUTH_REQUEST
+  OTP_REQUEST
+  OTP_VERIFY
+  SOCIAL_SIGN_IN
+  OAUTH_CALLBACK
+  SESSION_READ
+  SESSION_SIGN_OUT
+  IDENTITY_LINK
+  RATE_LIMITED
+}
+
+enum SecurityAuditOutcome {
+  SUCCESS
+  FAILURE
+}
+
+// Better Auth owns these tables. The model names are intentionally prefixed
+// so the auth schema cannot collide with Cotali's domain Account model.
+model AuthUser {
+  id             String        @id
+  name           String
+  email          String
+  email_verified Boolean       @default(false)
+  image          String?
+  created_at     DateTime      @default(now()) @db.Timestamptz(3)
+  updated_at     DateTime      @updatedAt @db.Timestamptz(3)
+  authsessions   AuthSession[]
+  authaccounts   AuthAccount[]
+
+  @@unique([email])
+  @@map("auth_users")
+}
+
+model AuthSession {
+  id         String   @id
+  expires_at DateTime @db.Timestamptz(3)
+  token      String
+  created_at DateTime @default(now()) @db.Timestamptz(3)
+  updated_at DateTime @updatedAt @db.Timestamptz(3)
+  ip_address String?
+  user_agent String?
+  user_id    String
+  authuser   AuthUser @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([token])
+  @@index([user_id])
+  @@map("auth_sessions")
+}
+
+model AuthAccount {
+  id                       String    @id
+  issuer                   String
+  account_id               String
+  provider_id              String
+  user_id                  String
+  authuser                 AuthUser  @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  access_token             String?
+  refresh_token            String?
+  id_token                 String?
+  access_token_expires_at  DateTime? @db.Timestamptz(3)
+  refresh_token_expires_at DateTime? @db.Timestamptz(3)
+  scope                    String?
+  password                 String?
+  created_at               DateTime  @default(now()) @db.Timestamptz(3)
+  updated_at               DateTime  @updatedAt @db.Timestamptz(3)
+
+  @@unique([issuer, account_id], map: "auth_account_issuer_account_id_uidx")
+  @@index([user_id])
+  @@map("auth_accounts")
+}
+
+model AuthVerification {
+  id         String   @id
+  identifier String
+  value      String
+  expires_at DateTime @db.Timestamptz(3)
+  created_at DateTime @default(now()) @db.Timestamptz(3)
+  updated_at DateTime @updatedAt @db.Timestamptz(3)
+
+  @@index([identifier])
+  @@map("auth_verifications")
+}
+
+model AuthRateLimit {
+  id           String @id
+  key          String
+  count        Int
+  last_request BigInt
+
+  @@unique([key])
+  @@map("auth_rate_limits")
+}
+
 model Account {
-  id               String    @id @default(uuid()) @db.Uuid
-  authSubject      String    @unique @map("auth_subject")
-  professionalName String?   @map("professional_name") @db.VarChar(120)
-  businessName     String?   @map("business_name") @db.VarChar(120)
-  phone            String?   @db.VarChar(20)
-  document         String?   @db.VarChar(20)
-  address          String?   @db.VarChar(240)
+  id               String          @id @default(uuid()) @db.Uuid
+  authSubject      String          @unique @map("auth_subject")
+  professionalName String?         @map("professional_name") @db.VarChar(120)
+  businessName     String?         @map("business_name") @db.VarChar(120)
+  phone            String?         @db.VarChar(20)
+  document         String?         @db.VarChar(20)
+  address          String?         @db.VarChar(240)
   clients          Client[]
   quotes           Quote[]
   mutations        Mutation[]
   voiceJobs        VoiceJob[]
-  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt        DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  consentRecords   ConsentRecord[]
+  valueEvents      ValueEvent[]
+  createdAt        DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime        @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   @@map("accounts")
+}
+
+model ConsentRecord {
+  id            String         @id @default(uuid()) @db.Uuid
+  accountId     String         @map("account_id") @db.Uuid
+  account       Account        @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  purpose       ConsentPurpose
+  granted       Boolean
+  policyVersion String         @map("policy_version") @db.VarChar(40)
+  channel       ConsentChannel
+  createdAt     DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@index([accountId, purpose, createdAt])
+  @@map("consent_records")
+}
+
+model ValueEvent {
+  id         String         @id @default(uuid()) @db.Uuid
+  accountId  String         @map("account_id") @db.Uuid
+  account    Account        @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  eventKey   String         @map("event_key") @db.VarChar(120)
+  name       ValueEventName
+  metadata   Json?
+  occurredAt DateTime       @default(now()) @map("occurred_at") @db.Timestamptz(3)
+
+  @@unique([accountId, eventKey])
+  @@index([accountId, name, occurredAt])
+  @@map("value_events")
+}
+
+// Security events are intentionally separate from product and marketing events.
+// There is no update/delete API for this model; the migration also protects it
+// with a database trigger.
+model SecurityAuditEvent {
+  id          String                 @id @default(uuid()) @db.Uuid
+  name        SecurityAuditEventName
+  outcome     SecurityAuditOutcome
+  requestId   String?                @map("request_id") @db.VarChar(120)
+  authSubject String?                @map("auth_subject") @db.VarChar(120)
+  method      String                 @db.VarChar(10)
+  path        String                 @db.VarChar(160)
+  statusCode  Int?                   @map("status_code")
+  metadata    Json?
+  occurredAt  DateTime               @default(now()) @map("occurred_at") @db.Timestamptz(3)
+
+  @@index([name, occurredAt])
+  @@index([authSubject, occurredAt])
+  @@map("security_audit_events")
 }
 
 model Client {
@@ -74,25 +233,25 @@ model Client {
 }
 
 model Quote {
-  id                String         @id @default(uuid()) @db.Uuid
-  accountId         String         @map("account_id") @db.Uuid
-  account           Account        @relation(fields: [accountId], references: [id], onDelete: Restrict)
-  clientId          String         @map("client_id") @db.Uuid
-  client            Client         @relation(fields: [accountId, clientId], references: [accountId, id], onDelete: Restrict)
-  status            QuoteStatus    @default(DRAFT)
-  paymentStatus     PaymentStatus  @default(PENDING) @map("payment_status")
-  totalCents        BigInt         @map("total_cents")
-  currency          String         @default("BRL") @db.Char(3)
+  id                String          @id @default(uuid()) @db.Uuid
+  accountId         String          @map("account_id") @db.Uuid
+  account           Account         @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  clientId          String          @map("client_id") @db.Uuid
+  client            Client          @relation(fields: [accountId, clientId], references: [accountId, id], onDelete: Restrict)
+  status            QuoteStatus     @default(DRAFT)
+  paymentStatus     PaymentStatus   @default(PENDING) @map("payment_status")
+  totalCents        BigInt          @map("total_cents")
+  currency          String          @default("BRL") @db.Char(3)
   revisions         QuoteRevision[] @relation("QuoteRevisions")
-  currentRevisionId String?        @unique @map("current_revision_id") @db.Uuid
-  currentRevision   QuoteRevision? @relation("CurrentQuoteRevision", fields: [id, currentRevisionId], references: [quoteId, id], onDelete: Restrict)
-  createdAt         DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt         DateTime       @updatedAt @map("updated_at") @db.Timestamptz(3)
-  deletedAt         DateTime?      @map("deleted_at") @db.Timestamptz(3)
+  currentRevisionId String?         @unique @map("current_revision_id") @db.Uuid
+  currentRevision   QuoteRevision?  @relation("CurrentQuoteRevision", fields: [id, currentRevisionId], references: [quoteId, id], onDelete: Restrict)
+  createdAt         DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt         DateTime        @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt         DateTime?       @map("deleted_at") @db.Timestamptz(3)
 
+  @@unique([id, currentRevisionId])
   @@index([accountId, createdAt])
   @@index([clientId])
-  @@unique([id, currentRevisionId])
   @@map("quotes")
 }
 
@@ -125,30 +284,30 @@ model QuoteRevision {
 }
 
 model ServiceLine {
-  id               String        @id @default(uuid()) @db.Uuid
-  revisionId       String        @map("revision_id") @db.Uuid
-  revision         QuoteRevision @relation(fields: [revisionId], references: [id], onDelete: Cascade)
-  description      String        @db.VarChar(160)
-  quantity         Decimal       @db.Decimal(18, 3)
-  unit             String?       @db.VarChar(20)
-  unitPriceCents   BigInt?       @map("unit_price_cents")
-  totalCents       BigInt?       @map("total_cents")
-  position         Int
+  id             String        @id @default(uuid()) @db.Uuid
+  revisionId     String        @map("revision_id") @db.Uuid
+  revision       QuoteRevision @relation(fields: [revisionId], references: [id], onDelete: Cascade)
+  description    String        @db.VarChar(160)
+  quantity       Decimal       @db.Decimal(18, 3)
+  unit           String?       @db.VarChar(20)
+  unitPriceCents BigInt?       @map("unit_price_cents")
+  totalCents     BigInt?       @map("total_cents")
+  position       Int
 
   @@unique([revisionId, position])
   @@map("service_lines")
 }
 
 model MaterialLine {
-  id               String        @id @default(uuid()) @db.Uuid
-  revisionId       String        @map("revision_id") @db.Uuid
-  revision         QuoteRevision @relation(fields: [revisionId], references: [id], onDelete: Cascade)
-  description      String        @db.VarChar(160)
-  quantity         Decimal       @db.Decimal(18, 3)
-  unit             String?       @db.VarChar(20)
-  unitPriceCents   BigInt?       @map("unit_price_cents")
-  totalCents       BigInt?       @map("total_cents")
-  position         Int
+  id             String        @id @default(uuid()) @db.Uuid
+  revisionId     String        @map("revision_id") @db.Uuid
+  revision       QuoteRevision @relation(fields: [revisionId], references: [id], onDelete: Cascade)
+  description    String        @db.VarChar(160)
+  quantity       Decimal       @db.Decimal(18, 3)
+  unit           String?       @db.VarChar(20)
+  unitPriceCents BigInt?       @map("unit_price_cents")
+  totalCents     BigInt?       @map("total_cents")
+  position       Int
 
   @@unique([revisionId, position])
   @@map("material_lines")
@@ -169,25 +328,25 @@ model Mutation {
 }
 
 model VoiceJob {
-  id            String        @id @default(uuid()) @db.Uuid
-  accountId     String        @map("account_id") @db.Uuid
-  account       Account       @relation(fields: [accountId], references: [id], onDelete: Cascade)
-  mutationId    String        @map("mutation_id") @db.Uuid
-  fingerprint   String        @db.Char(64)
-  status        VoiceJobStatus @default(PENDING)
-  attempts      Int           @default(0)
-  audioBytes    Bytes?        @map("audio_bytes") @db.ByteA
-  filename      String        @db.VarChar(255)
-  mimeType      String        @map("mime_type") @db.VarChar(100)
+  id             String         @id @default(uuid()) @db.Uuid
+  accountId      String         @map("account_id") @db.Uuid
+  account        Account        @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  mutationId     String         @map("mutation_id") @db.Uuid
+  fingerprint    String         @db.Char(64)
+  status         VoiceJobStatus @default(PENDING)
+  attempts       Int            @default(0)
+  audioBytes     Bytes?         @map("audio_bytes") @db.ByteA
+  filename       String         @db.VarChar(255)
+  mimeType       String         @map("mime_type") @db.VarChar(100)
   interpretation Json?
-  errorMessage  String?       @map("error_message") @db.VarChar(2000)
-  availableAt   DateTime      @default(now()) @map("available_at") @db.Timestamptz(3)
-  lockedAt      DateTime?     @map("locked_at") @db.Timestamptz(3)
-  lockedBy      String?       @map("locked_by") @db.VarChar(120)
-  startedAt     DateTime?     @map("started_at") @db.Timestamptz(3)
-  completedAt   DateTime?     @map("completed_at") @db.Timestamptz(3)
-  createdAt     DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt     DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
+  errorMessage   String?        @map("error_message") @db.VarChar(2000)
+  availableAt    DateTime       @default(now()) @map("available_at") @db.Timestamptz(3)
+  lockedAt       DateTime?      @map("locked_at") @db.Timestamptz(3)
+  lockedBy       String?        @map("locked_by") @db.VarChar(120)
+  startedAt      DateTime?      @map("started_at") @db.Timestamptz(3)
+  completedAt    DateTime?      @map("completed_at") @db.Timestamptz(3)
+  createdAt      DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime       @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   @@unique([accountId, mutationId])
   @@index([status, availableAt])

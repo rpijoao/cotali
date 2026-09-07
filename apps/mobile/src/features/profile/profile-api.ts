@@ -7,10 +7,7 @@ import {
   loadProfessionalProfile,
   saveProfessionalProfile,
 } from './profile-storage';
-
-const apiUrl = process.env.EXPO_PUBLIC_API_URL ?? 'http://10.0.2.2:3333';
-const developmentToken =
-  process.env.EXPO_PUBLIC_DEV_AUTH_TOKEN ?? (__DEV__ ? 'dev:local-user' : null);
+import { authenticatedFetch } from '../../auth/api-client';
 
 export async function getProfessionalProfile(): Promise<ProfessionalProfile> {
   const response = await request('/v1/profile', { method: 'GET' });
@@ -74,18 +71,7 @@ export function toLocalProfessionalProfile(
 }
 
 function request(path: string, init: RequestInit): Promise<Response> {
-  if (!developmentToken) {
-    return Promise.reject(
-      new Error('A sessão autenticada ainda não foi configurada.'),
-    );
-  }
-  return fetch(`${apiUrl}${path}`, {
-    ...init,
-    headers: {
-      ...init.headers,
-      authorization: `Bearer ${developmentToken}`,
-    },
-  });
+  return authenticatedFetch(path, init);
 }
 
 function toUpdateInput(

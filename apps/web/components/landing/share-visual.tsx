@@ -27,7 +27,11 @@ export function ShareVisual() {
       const end = window.innerHeight * 0.2;
       const nextProgress = clamp((start - top) / (start - end));
 
-      setProgress((currentProgress) => (Math.abs(currentProgress - nextProgress) > 0.003 ? nextProgress : currentProgress));
+      setProgress((currentProgress) =>
+        Math.abs(currentProgress - nextProgress) > 0.003
+          ? nextProgress
+          : currentProgress,
+      );
     };
 
     const scheduleUpdate = () => {
@@ -61,13 +65,15 @@ export function ShareVisual() {
     clamp((progress - 0.26) / 0.3),
     clamp((progress - 0.5) / 0.3),
   ];
-  const motionStyle = (isScrollLinked
-    ? {
-        '--cotali-share-request-progress': messageProgress[0],
-        '--cotali-share-response-progress': messageProgress[1],
-        '--cotali-share-pdf-progress': messageProgress[2],
-      }
-    : undefined) as CSSProperties | undefined;
+  const motionStyle = (
+    isScrollLinked
+      ? {
+          '--cotali-share-request-progress': messageProgress[0],
+          '--cotali-share-response-progress': messageProgress[1],
+          '--cotali-share-pdf-progress': messageProgress[2],
+        }
+      : undefined
+  ) as CSSProperties | undefined;
 
   return (
     <div

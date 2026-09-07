@@ -1,4 +1,4 @@
-name: Deploy Cotali LP to GitHub Pages
+name: Deploy Cotali web to Cloudflare Pages
 
 on:
   push:
@@ -8,8 +8,6 @@ on:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
   group: pages
@@ -19,7 +17,9 @@ jobs:
   build:
     runs-on: ubuntu-latest
     env:
-      GITHUB_PAGES: 'true'
+      NEXT_PUBLIC_API_URL: 'https://api.cotali.com.br'
+      NEXT_PUBLIC_AUTH_APPLE_ENABLED: 'false'
+      CLOUDFLARE_ACCOUNT_ID: '6c593f1b3dd3382141690bc246ccd2e5'
 
     steps:
       - name: Checkout
@@ -36,30 +36,15 @@ jobs:
           node-version: 24
           cache: pnpm
 
-      - name: Configure GitHub Pages
-        uses: actions/configure-pages@v5
-        with:
-          enablement: true
-
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
       - name: Build landing page
         run: pnpm --filter @cotali/web build
 
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
         with:
-          path: apps/web/out
-
-  deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    runs-on: ubuntu-latest
-    needs: build
-
-    steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ env.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy apps/web/out --project-name=cotali-web --branch=main

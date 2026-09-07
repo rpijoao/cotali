@@ -23,9 +23,16 @@ export function FlowVisual() {
       const { top } = visual.getBoundingClientRect();
       const start = window.innerHeight * 0.94;
       const end = window.innerHeight * 0.18;
-      const nextProgress = Math.min(1, Math.max(0, (start - top) / (start - end)));
+      const nextProgress = Math.min(
+        1,
+        Math.max(0, (start - top) / (start - end)),
+      );
 
-      setProgress((currentProgress) => (Math.abs(currentProgress - nextProgress) > 0.003 ? nextProgress : currentProgress));
+      setProgress((currentProgress) =>
+        Math.abs(currentProgress - nextProgress) > 0.003
+          ? nextProgress
+          : currentProgress,
+      );
     };
 
     const scheduleUpdate = () => {
@@ -57,14 +64,16 @@ export function FlowVisual() {
   const quoteProgress = Math.min(1, Math.max(0, (progress - 0.24) / 0.76));
   const voiceOpacityProgress = Math.min(1, progress * 1.7);
   const quoteOpacityProgress = Math.min(1, quoteProgress * 1.7);
-  const motionStyle = (isScrollLinked
-    ? {
-        '--cotali-flow-voice-progress': progress,
-        '--cotali-flow-quote-progress': quoteProgress,
-        '--cotali-flow-voice-opacity-progress': voiceOpacityProgress,
-        '--cotali-flow-quote-opacity-progress': quoteOpacityProgress,
-      }
-    : undefined) as CSSProperties | undefined;
+  const motionStyle = (
+    isScrollLinked
+      ? {
+          '--cotali-flow-voice-progress': progress,
+          '--cotali-flow-quote-progress': quoteProgress,
+          '--cotali-flow-voice-opacity-progress': voiceOpacityProgress,
+          '--cotali-flow-quote-opacity-progress': quoteOpacityProgress,
+        }
+      : undefined
+  ) as CSSProperties | undefined;
 
   return (
     <div

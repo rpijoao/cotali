@@ -13,24 +13,14 @@ import { File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import { Platform, TurboModuleRegistry } from 'react-native';
 import type NativeShare from 'react-native-share';
-
-const apiUrl = process.env.EXPO_PUBLIC_API_URL ?? 'http://10.0.2.2:3333';
-const developmentToken =
-  process.env.EXPO_PUBLIC_DEV_AUTH_TOKEN ?? (__DEV__ ? 'dev:local-user' : null);
+import { authenticatedFetch } from '../../auth/api-client';
 
 export async function createQuoteDraft(
   input: CreateQuoteDraft,
 ): Promise<QuoteDraft> {
-  if (!developmentToken) {
-    throw new Error('A sessão autenticada ainda não foi configurada.');
-  }
-
-  const response = await fetch(`${apiUrl}/v1/quotes`, {
+  const response = await authenticatedFetch('/v1/quotes', {
     body: JSON.stringify(input),
-    headers: {
-      authorization: `Bearer ${developmentToken}`,
-      'content-type': 'application/json',
-    },
+    headers: { 'content-type': 'application/json' },
     method: 'POST',
   });
   const body: unknown = await response.json();
@@ -48,18 +38,11 @@ export async function updateQuoteRevision(
   quoteId: string,
   input: UpdateQuoteRevision,
 ): Promise<QuoteDetails> {
-  if (!developmentToken) {
-    throw new Error('A sessão autenticada ainda não foi configurada.');
-  }
-
-  const response = await fetch(
-    `${apiUrl}/v1/quotes/${encodeURIComponent(quoteId)}/revisions`,
+  const response = await authenticatedFetch(
+    `/v1/quotes/${encodeURIComponent(quoteId)}/revisions`,
     {
       body: JSON.stringify(input),
-      headers: {
-        authorization: `Bearer ${developmentToken}`,
-        'content-type': 'application/json',
-      },
+      headers: { 'content-type': 'application/json' },
       method: 'POST',
     },
   );
@@ -77,12 +60,7 @@ export async function updateQuoteRevision(
 }
 
 export async function listQuoteSummaries(): Promise<QuoteSummary[]> {
-  if (!developmentToken) {
-    throw new Error('A sessão autenticada ainda não foi configurada.');
-  }
-
-  const response = await fetch(`${apiUrl}/v1/quotes`, {
-    headers: { authorization: `Bearer ${developmentToken}` },
+  const response = await authenticatedFetch('/v1/quotes', {
     method: 'GET',
   });
   const body: unknown = await response.json();
@@ -99,13 +77,9 @@ export async function listQuoteSummaries(): Promise<QuoteSummary[]> {
 }
 
 export async function getQuoteDetails(quoteId: string): Promise<QuoteDetails> {
-  if (!developmentToken) {
-    throw new Error('A sessão autenticada ainda não foi configurada.');
-  }
-
-  const response = await fetch(
-    `${apiUrl}/v1/quotes/${encodeURIComponent(quoteId)}`,
-    { headers: { authorization: `Bearer ${developmentToken}` }, method: 'GET' },
+  const response = await authenticatedFetch(
+    `/v1/quotes/${encodeURIComponent(quoteId)}`,
+    { method: 'GET' },
   );
   const body: unknown = await response.json();
 
@@ -121,16 +95,9 @@ export async function getQuoteDetails(quoteId: string): Promise<QuoteDetails> {
 }
 
 export async function downloadQuoteProposal(quoteId: string): Promise<File> {
-  if (!developmentToken) {
-    throw new Error('A sessão autenticada ainda não foi configurada.');
-  }
-
-  const response = await fetch(
-    `${apiUrl}/v1/quotes/${encodeURIComponent(quoteId)}/proposal.pdf`,
-    {
-      headers: { authorization: `Bearer ${developmentToken}` },
-      method: 'GET',
-    },
+  const response = await authenticatedFetch(
+    `/v1/quotes/${encodeURIComponent(quoteId)}/proposal.pdf`,
+    { method: 'GET' },
   );
 
   if (!response.ok) {
@@ -249,17 +216,12 @@ export async function interpretQuoteVoice(input: {
   mutationId: string;
   uri: string;
 }): Promise<VoiceInterpretation> {
-  if (!developmentToken) {
-    throw new Error('A sessão autenticada ainda não foi configurada.');
-  }
-
   const form = new FormData();
   form.append('mutationId', input.mutationId);
   await appendAudioPart(form, input.uri);
 
-  const response = await fetch(`${apiUrl}/v1/voice/interpretations`, {
+  const response = await authenticatedFetch('/v1/voice/interpretations', {
     body: form,
-    headers: { authorization: `Bearer ${developmentToken}` },
     method: 'POST',
   });
   const body: unknown = await response.json();
@@ -280,18 +242,13 @@ export async function interpretQuoteEdit(input: {
   mutationId: string;
   uri: string;
 }): Promise<VoiceQuoteEditInterpretation> {
-  if (!developmentToken) {
-    throw new Error('A sessão autenticada ainda não foi configurada.');
-  }
-
   const form = new FormData();
   form.append('draft', JSON.stringify(input.draft));
   form.append('mutationId', input.mutationId);
   await appendAudioPart(form, input.uri);
 
-  const response = await fetch(`${apiUrl}/v1/voice/commands`, {
+  const response = await authenticatedFetch('/v1/voice/commands', {
     body: form,
-    headers: { authorization: `Bearer ${developmentToken}` },
     method: 'POST',
   });
   const body: unknown = await response.json();
@@ -344,9 +301,8 @@ async function waitForVoiceInterpretation(
       throw new Error(job.error ?? 'Não foi possível processar o áudio.');
     }
     await sleep(1_000);
-    const response = await fetch(
-      `${apiUrl}/v1/voice/interpretations/${mutationId}`,
-      { headers: { authorization: `Bearer ${developmentToken}` } },
+    const response = await authenticatedFetch(
+      `/v1/voice/interpretations/${mutationId}`,
     );
     const body: unknown = await response.json();
     if (!response.ok) {
