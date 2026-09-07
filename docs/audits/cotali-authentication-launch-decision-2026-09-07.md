@@ -27,6 +27,10 @@ corte. Apple permanece planejado para uma fase posterior.
   `EXPO_PUBLIC_AUTH_APPLE_ENABLED=false`).
 - A ausência de Apple não altera o modelo de identidade, sessão, OTP,
   autorização multi-tenant, consentimento ou auditoria.
+- Para o fluxo web autenticado, a API usa `https://api.cotali.com.br` como
+  domínio same-site de `https://cotali.com.br`. O hostname Fly permanece como
+  origem operacional, mas não é usado pelo navegador; isso permite manter
+  `SameSite=Lax` sem depender de cookie cross-site.
 
 ## Impactos e limites
 

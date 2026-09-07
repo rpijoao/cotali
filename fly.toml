@@ -7,7 +7,7 @@ primary_region = 'gru'
 [env]
   NODE_ENV = 'production'
   PORT = '3333'
-  BETTER_AUTH_URL = 'https://cotali-api-staging.fly.dev'
+  BETTER_AUTH_URL = 'https://api.cotali.com.br'
   WEB_APP_URL = 'https://cotali.com.br'
   AUTH_COOKIE_SAME_SITE = 'lax'
   TRUSTED_PROXY_HOPS = '1'

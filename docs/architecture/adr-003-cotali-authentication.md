@@ -86,6 +86,10 @@ concorrentes no PostgreSQL Neon de desenvolvimento.
   A API declara `httpOnly`, `path=/`, `secure` conforme o protocolo da API e
   `SameSite=lax` por padrão. `AUTH_COOKIE_SAME_SITE=none` só pode ser usado
   explicitamente com HTTPS; cookies de produção exigem `BETTER_AUTH_URL` HTTPS.
+- A API deve ser acessada pelo domínio same-site `https://api.cotali.com.br`
+  quando o web estiver em `https://cotali.com.br`. O hostname `fly.dev` é
+  somente operacional; não deve ser usado pelo navegador no fluxo autenticado,
+  pois faria o cookie depender de contexto cross-site.
 - Android usa `@better-auth/expo` e `expo-secure-store`; chamadas à API de
   negócio recuperam o cookie armazenado e o enviam no header `Cookie`.
 - A sessão expira após 30 dias de inatividade e é renovada diariamente quando
@@ -168,7 +172,8 @@ Se um deles for configurado, o outro também deve ser informado; com os dois
 presentes, o provedor Apple é habilitado automaticamente.
 
 O redirect OAuth do Google deve apontar para o endpoint Better Auth do ambiente
-correspondente (`/v1/auth/callback/google`). O redirect do Apple será adicionado
+correspondente (`https://api.cotali.com.br/v1/auth/callback/google` no ambiente
+de homologação atual). O redirect do Apple será adicionado
 quando o provedor for habilitado (`/v1/auth/callback/apple`). A API valida
 `callbackURL`, `errorCallbackURL` e
 `newUserCallbackURL` antes de delegar ao Better Auth. O app Expo usa o scheme
