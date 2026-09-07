@@ -49,6 +49,7 @@ COPY --from=build /app/apps/api/node_modules ./apps/api/node_modules
 COPY --from=build /app/apps/api/dist ./apps/api/dist
 
 COPY --from=build /app/packages/contracts/package.json ./packages/contracts/package.json
+COPY --from=build /app/packages/contracts/node_modules ./packages/contracts/node_modules
 COPY --from=build /app/packages/contracts/dist ./packages/contracts/dist
 COPY --from=build /app/packages/database/package.json ./packages/database/package.json
 COPY --from=build /app/packages/database/node_modules ./packages/database/node_modules
@@ -57,6 +58,7 @@ COPY --from=build /app/packages/database/prisma ./packages/database/prisma
 COPY --from=build /app/packages/domain/package.json ./packages/domain/package.json
 COPY --from=build /app/packages/domain/dist ./packages/domain/dist
 COPY --from=build /app/packages/voice/package.json ./packages/voice/package.json
+COPY --from=build /app/packages/voice/node_modules ./packages/voice/node_modules
 COPY --from=build /app/packages/voice/dist ./packages/voice/dist
 
 EXPOSE 3333
