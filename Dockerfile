@@ -50,6 +50,7 @@ COPY --from=build /app/apps/api/dist ./apps/api/dist
 COPY --from=build /app/packages/contracts/package.json ./packages/contracts/package.json
 COPY --from=build /app/packages/contracts/dist ./packages/contracts/dist
 COPY --from=build /app/packages/database/package.json ./packages/database/package.json
+COPY --from=build /app/packages/database/node_modules ./packages/database/node_modules
 COPY --from=build /app/packages/database/dist ./packages/database/dist
 COPY --from=build /app/packages/database/prisma ./packages/database/prisma
 COPY --from=build /app/packages/domain/package.json ./packages/domain/package.json

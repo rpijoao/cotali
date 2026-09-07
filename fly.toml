@@ -16,7 +16,7 @@ primary_region = 'gru'
 
 [deploy]
   # Executado pela Fly antes de promover a nova versão.
-  release_command = 'node_modules/.bin/prisma migrate deploy --schema packages/database/prisma/schema.prisma'
+  release_command = 'node packages/database/node_modules/prisma/build/index.js migrate deploy --schema packages/database/prisma/schema.prisma'
 
 [http_service]
   internal_port = 3333
