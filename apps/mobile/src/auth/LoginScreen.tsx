@@ -10,6 +10,8 @@ import {
 import { authClient } from './auth-client';
 import { authenticatedFetch } from './api-client';
 
+const appleLoginEnabled = process.env.EXPO_PUBLIC_AUTH_APPLE_ENABLED === 'true';
+
 export function LoginScreen(props: { onAuthenticated: () => void }) {
   const [email, setEmail] = useState('');
   const [otp, setOtp] = useState('');
@@ -98,8 +100,8 @@ export function LoginScreen(props: { onAuthenticated: () => void }) {
           Entre para criar seu próximo orçamento.
         </Text>
         <Text style={styles.subtitle}>
-          Use seu email ou continue com Google ou Apple. Você não precisa criar
-          uma senha.
+          Use seu email ou continue com Google. Você não precisa criar uma
+          senha.
         </Text>
 
         <TextInput
@@ -166,13 +168,15 @@ export function LoginScreen(props: { onAuthenticated: () => void }) {
         >
           <Text style={styles.secondaryButtonText}>Continuar com Google</Text>
         </Pressable>
-        <Pressable
-          disabled={busy}
-          onPress={() => signInSocial('apple')}
-          style={styles.secondaryButton}
-        >
-          <Text style={styles.secondaryButtonText}>Continuar com Apple</Text>
-        </Pressable>
+        {appleLoginEnabled ? (
+          <Pressable
+            disabled={busy}
+            onPress={() => signInSocial('apple')}
+            style={styles.secondaryButton}
+          >
+            <Text style={styles.secondaryButtonText}>Continuar com Apple</Text>
+          </Pressable>
+        ) : null}
 
         <Pressable
           accessibilityRole="checkbox"

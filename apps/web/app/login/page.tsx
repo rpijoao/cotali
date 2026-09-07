@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { authClient, recordMarketingConsent } from '../../lib/auth-client';
 
 const PENDING_SOCIAL_CONSENT_KEY = 'cotali.pending-marketing-consent';
+const appleLoginEnabled = process.env.NEXT_PUBLIC_AUTH_APPLE_ENABLED === 'true';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -121,8 +122,8 @@ export default function LoginPage() {
             Entre para criar seu próximo orçamento.
           </h1>
           <p className="mt-5 text-sm leading-6 text-cotali-blue/65">
-            Use seu email ou continue com Google ou Apple. Você não precisa
-            criar uma senha.
+            Use seu email ou continue com Google. Você não precisa criar uma
+            senha.
           </p>
 
           <label
@@ -187,7 +188,11 @@ export default function LoginPage() {
             <span>ou</span>
             <span className="h-px flex-1 bg-cotali-blue/15" />
           </div>
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div
+            className={
+              appleLoginEnabled ? 'grid gap-3 sm:grid-cols-2' : 'grid gap-3'
+            }
+          >
             <button
               className="rounded-xl border border-cotali-blue/20 px-4 py-3 text-sm font-bold transition hover:border-cotali-blue disabled:opacity-50"
               disabled={busy}
@@ -196,14 +201,16 @@ export default function LoginPage() {
             >
               Google
             </button>
-            <button
-              className="rounded-xl border border-cotali-blue/20 px-4 py-3 text-sm font-bold transition hover:border-cotali-blue disabled:opacity-50"
-              disabled={busy}
-              onClick={() => signInWithSocial('apple')}
-              type="button"
-            >
-              Apple
-            </button>
+            {appleLoginEnabled ? (
+              <button
+                className="rounded-xl border border-cotali-blue/20 px-4 py-3 text-sm font-bold transition hover:border-cotali-blue disabled:opacity-50"
+                disabled={busy}
+                onClick={() => signInWithSocial('apple')}
+                type="button"
+              >
+                Apple
+              </button>
+            ) : null}
           </div>
 
           <label className="mt-6 flex cursor-pointer items-start gap-3 text-xs leading-5 text-cotali-blue/65">

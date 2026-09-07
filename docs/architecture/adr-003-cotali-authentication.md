@@ -7,10 +7,17 @@
 ## Contexto
 
 O Cotali precisa permitir que um profissional autônomo entre pelo celular e
-continue o trabalho no web quando essa superfície estiver disponível. O MVP
-deve ter um usuário por conta, suportar Google, Apple e código enviado por
-email, manter sessões persistentes e não transformar dados do orçamento em uma
-base de marketing sem consentimento.
+continue o trabalho no web quando essa superfície estiver disponível. O corte
+inicial de produção deve ter um usuário por conta, suportar Google e código
+enviado por email, manter sessões persistentes e não transformar dados do
+orçamento em uma base de marketing sem consentimento.
+
+### Atualização de lançamento — 2026-09-07
+
+A produção inicial será lançada com Google OAuth e Email OTP. Apple OAuth foi
+adiado por decisão de produto e não estará ativo neste corte. A implementação
+continua preparada para habilitá-lo posteriormente, sem alterar a identidade
+interna ou o contrato de domínio.
 
 O backend atual é Fastify + Prisma + PostgreSQL. A API já recebe uma identidade
 abstrata, mas o modo de desenvolvimento usava `Bearer dev:local-user` e a
@@ -39,9 +46,9 @@ os agregados do Cotali conheçam o schema interno do provedor.
 ### Métodos do MVP
 
 - Google OAuth.
-- Apple OAuth, incluindo email relay privado; a identidade do provedor é o
-  `sub`, nunca o email.
 - Email OTP.
+- Apple OAuth, incluindo email relay privado; a identidade do provedor é o
+  `sub`, nunca o email. Fica planejado para uma fase posterior.
 
 Não entram no MVP: senha, SMS/telefone, códigos de recuperação ou login
 Microsoft/SSO corporativo. Eles podem ser adicionados como novos métodos sem
@@ -145,7 +152,6 @@ O arquivo `apps/api/.env.example` contém os nomes. Em produção são obrigató
 
 - `BETTER_AUTH_URL` e `BETTER_AUTH_SECRET`;
 - `GOOGLE_CLIENT_ID` e `GOOGLE_CLIENT_SECRET`;
-- `APPLE_CLIENT_ID` e `APPLE_CLIENT_SECRET`;
 - `RESEND_API_KEY` e `RESEND_FROM_EMAIL`;
 - `PRIVACY_POLICY_VERSION` igual à versão da política aprovada;
 - `DATABASE_URL` e `DATABASE_URL_UNPOOLED`;
@@ -157,9 +163,14 @@ O arquivo `apps/api/.env.example` contém os nomes. Em produção são obrigató
 - `AUTH_COOKIE_SAME_SITE` aceita `lax`, `strict` ou `none`; o padrão é `lax`.
   O valor `none` exige HTTPS e deve ser usado somente após revisão de CSRF.
 
-Os redirects OAuth de Google e Apple devem apontar para o endpoint Better Auth
-do ambiente correspondente (`/v1/auth/callback/google` ou
-`/v1/auth/callback/apple`). A API valida `callbackURL`, `errorCallbackURL` e
+`APPLE_CLIENT_ID` e `APPLE_CLIENT_SECRET` são opcionais no lançamento inicial.
+Se um deles for configurado, o outro também deve ser informado; com os dois
+presentes, o provedor Apple é habilitado automaticamente.
+
+O redirect OAuth do Google deve apontar para o endpoint Better Auth do ambiente
+correspondente (`/v1/auth/callback/google`). O redirect do Apple será adicionado
+quando o provedor for habilitado (`/v1/auth/callback/apple`). A API valida
+`callbackURL`, `errorCallbackURL` e
 `newUserCallbackURL` antes de delegar ao Better Auth. O app Expo usa o scheme
 `cotali://`; schemes `exp://` só entram nos defaults fora de produção.
 
@@ -207,8 +218,8 @@ com o schema Prisma.
   schema.
 - A entrega de email passa a depender da configuração, reputação e limites do
   Resend.
-- OAuth exige redirects separados por ambiente e configuração correta dos
-  apps Google/Apple.
+- OAuth exige redirects separados por ambiente e configuração correta do app
+  Google; Apple será configurado quando entrar no lançamento.
 - A sessão por cookie entre origens exige CORS restrito e HTTPS em produção.
 - A confiança de proxy, os alertas e os testes de abuso em homologação ainda
   precisam ser fechados antes da produção.
@@ -221,8 +232,8 @@ com o schema Prisma.
 2. Testar OTP expirado, código usado, cinco tentativas, rotação, enumeração para
    email existente/novo, entrada inválida, limite atingido e concorrência,
    sempre com respostas e logs genéricos.
-3. Testar Google e Apple em web, Android e iOS development build, incluindo
-   Apple relay privado.
+3. Testar Google em web e Android. Quando Apple for habilitado, testar também
+   Apple em web, Android e iOS development build, incluindo o relay privado.
 4. Confirmar que uma sessão existente continua funcionando durante uma falha
    temporária do provedor OAuth.
 5. Confirmar cookie seguro, CORS explícito, redaction de cookies/tokens e
@@ -237,7 +248,8 @@ com o schema Prisma.
 Evidência técnica adicionada no commit `5ac36a5`: a integração PostgreSQL cobre o
 ciclo de vida do email OTP (hash, expiração, tentativas, rotação e uso único) e o
 isolamento entre dois `authSubject`s nas consultas de quotes. Essa evidência não
-substitui a homologação com Google, Apple e Resend reais nem os testes web/mobile.
+substitui a homologação com Google e Resend reais nem os testes web/mobile. O
+teste de Apple permanece pendente até a ativação do provedor.
 A migration `20260906000600_align_auth_account_index_name` corrige o drift do nome
 do índice de `auth_accounts`; a CI remota `34067260618` aprovou o `migrate diff` e
 a migration foi aplicada na branch Neon `development`.

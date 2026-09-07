@@ -148,21 +148,29 @@ export function resolveBetterAuthBaseURL(): string {
   );
 }
 
-function createSocialProviders(isProduction: boolean) {
+export function createSocialProviders(isProduction: boolean) {
   const googleClientId = process.env.GOOGLE_CLIENT_ID;
   const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET;
   const appleClientId = process.env.APPLE_CLIENT_ID;
   const appleClientSecret = process.env.APPLE_CLIENT_SECRET;
 
+  assertProviderPair(
+    'GOOGLE_CLIENT_ID',
+    googleClientId,
+    'GOOGLE_CLIENT_SECRET',
+    googleClientSecret,
+  );
+  assertProviderPair(
+    'APPLE_CLIENT_ID',
+    appleClientId,
+    'APPLE_CLIENT_SECRET',
+    appleClientSecret,
+  );
+
   if (isProduction) {
     if (!googleClientId || !googleClientSecret) {
       throw new Error(
         'GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET are required in production.',
-      );
-    }
-    if (!appleClientId || !appleClientSecret) {
-      throw new Error(
-        'APPLE_CLIENT_ID and APPLE_CLIENT_SECRET are required in production.',
       );
     }
   }
@@ -185,6 +193,18 @@ function createSocialProviders(isProduction: boolean) {
         }
       : {}),
   };
+}
+
+function assertProviderPair(
+  clientIdName: string,
+  clientId: string | undefined,
+  clientSecretName: string,
+  clientSecret: string | undefined,
+): void {
+  if (Boolean(clientId) === Boolean(clientSecret)) return;
+  throw new Error(
+    `${clientIdName} and ${clientSecretName} must be provided together.`,
+  );
 }
 
 export function readTrustedOrigins(baseURL: string): string[] {

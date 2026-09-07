@@ -18,6 +18,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       NEXT_PUBLIC_API_URL: 'https://cotali-api-staging.fly.dev'
+      NEXT_PUBLIC_AUTH_APPLE_ENABLED: 'false'
       CLOUDFLARE_ACCOUNT_ID: '6c593f1b3dd3382141690bc246ccd2e5'
 
     steps:
